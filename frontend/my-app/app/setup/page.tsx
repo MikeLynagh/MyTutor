@@ -28,10 +28,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 const learningLevel = [
     {
         id: "beginner",
-        title: "beginner",
+        title: "Beginner",
     },
     {
-        id: "sommeKnowledge",
+        id: "some_knowledge",
         title: "Some Knowledge",
     },
     {
@@ -42,15 +42,15 @@ const learningLevel = [
 
 const learningStyle = [
     {
-        id: "shortExplain",
+        id: "short",
         title: "Short Explanations",
     },
     {
-        id: "quiz",
+        id: "quiz_often",
         title: "Quiz me often",
     },
     {
-        id: "stepByStep",
+        id: "step_by_step",
         title: "Step by Step",
     },
 ] as const
@@ -82,25 +82,53 @@ export default function Page() {
             motivationTopic: '',
             successDefined: '',
             currentLevel: 'beginner',
-            learningStyle: 'shortExplain'
+            learningStyle: 'short'
         },
     })
 
-    function onSubmit(data: z.infer<typeof formSchema>) {
-        toast("You submitted the following values:", {
+
+    async function onSubmit(data: z.infer<typeof formSchema>) {
+        try {
+            const payload = {
+                goal: data.learnTopic,
+                why: data.motivationTopic,
+                success_criteria: data.successDefined,
+                current_level: data.currentLevel,
+                learning_preference: data.learningStyle,
+            }
+
+            const response = await fetch("http://localhost:8000/api/missions", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(payload)
+            })
+
+            if(!response.ok){
+                throw new Error(`Failed to create mission: ${response.status}`)
+            }
+
+            const mission = await response.json()
+
+            toast("Mission created", {
             description: (
                 <pre className="mt-2 w-[320px] overflow-x-auto rounded-md bg-code p-4 text-code-foreground">
-                    <code>{JSON.stringify(data, null, 2)}</code>
+                    <code>{JSON.stringify(mission, null, 2)}</code>
                 </pre>
             ),
             position: "bottom-right",
-            classNames: {
-                content: "flex flex-col gap-2",
-            },
-            style: {
-                "--border-radius": "calc(var(--radius)  + 4px)",
-            } as React.CSSProperties,
         })
+        console.log("Created mission", mission)
+        }
+        catch (error){
+            console.error('saved to fail form data', error)
+
+            toast("Something went wrong", {
+                description: "Could not create your learning mission",
+                position: "bottom-right",
+            })
+        }
     }
 
     return (
@@ -244,6 +272,7 @@ export default function Page() {
                 </CardFooter>
             </Card>
             <Toaster />
+
         </main>
     )
 

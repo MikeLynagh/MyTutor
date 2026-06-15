@@ -1,18 +1,41 @@
 from fastapi import APIRouter
-from app.schemas.mission import MissionCreate
+from pydantic import BaseModel
+from typing import Literal
+from uuid import uuid4
+
 
 router = APIRouter()
 
-@router.post("/missions")
+class MissionCreate(BaseModel):
+    goal:str
+    why:str
+    success_criteria:str
+    current_level: Literal["beginner", "some_knowledge", "comfortable"]
+    learning_preference: Literal["short", "quiz_often", "step_by_step"]
+
+class MissionResponse(BaseModel):
+    id: str
+    title: str
+    goal: str
+    why: str
+    success_criteria: str
+    current_level: str
+    learning_preference: str
+    mission_type: str
+
+@router.post("/missions", response_model=MissionResponse)
 def create_mission(payload: MissionCreate):
-    return {
-        "id": "mission_demo_1",
-        "title": payload.goal,
-        "goal": payload.goal,
-        "why": payload.why,
-        "successCriteria": payload.success_criteria,
-        "currentLevel": payload.current_level,
-        "learningPreference": payload.learning_preference,
-        "sourceMode": payload.source_mode,
-        "missionType": "procedural_skill"
-    }
+    mission_id = str(uuid4())
+
+    return MissionResponse(
+        id =  mission_id,
+        title =  payload.goal,
+        goal =  payload.goal,
+        why =  payload.why,
+        successCriteria = payload.success_criteria,
+        currentLevel =  payload.current_level,
+        learningPreference =  payload.learning_preference,
+        sourceMode = payload.source_mode,
+        missionType = "procedural_skill",
+    )
+    
