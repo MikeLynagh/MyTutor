@@ -101,9 +101,9 @@ export default function Page() {
                 source_mode: "web",
             }
 
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
-            const response = await fetch(`${apiUrl}/api/missions`, {
+            const response = await fetch(`${apiUrl.replace(/\/$/, "")}/api/missions`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -126,8 +126,8 @@ export default function Page() {
                 </pre>
             ),
             position: "bottom-right",
-            router.push(`/missions/${missionId}/plan`)
         })
+        router.push(`/setup/mission/${missionId}/plan`)
         console.log("Created mission", mission)
         }
         catch (error){
