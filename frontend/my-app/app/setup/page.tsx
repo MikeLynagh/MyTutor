@@ -23,6 +23,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { useRouter } from "next/navigation";
+
 
 
 const learningLevel = [
@@ -75,6 +77,7 @@ const formSchema = z.object({
 
 
 export default function Page() {
+    const router = useRouter();
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: {
@@ -95,9 +98,12 @@ export default function Page() {
                 success_criteria: data.successDefined,
                 current_level: data.currentLevel,
                 learning_preference: data.learningStyle,
+                source_mode: "web",
             }
 
-            const response = await fetch("http://localhost:8000/api/missions", {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL
+
+            const response = await fetch(`${apiUrl}/api/missions`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -111,6 +117,8 @@ export default function Page() {
 
             const mission = await response.json()
 
+            const missionId = mission.id;
+
             toast("Mission created", {
             description: (
                 <pre className="mt-2 w-[320px] overflow-x-auto rounded-md bg-code p-4 text-code-foreground">
@@ -118,6 +126,7 @@ export default function Page() {
                 </pre>
             ),
             position: "bottom-right",
+            router.push(`/missions/${missionId}/plan`)
         })
         console.log("Created mission", mission)
         }
