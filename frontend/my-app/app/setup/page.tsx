@@ -118,6 +118,7 @@ export default function Page() {
             const mission = await response.json()
 
             const missionId = mission.id;
+            window.sessionStorage.setItem(`mission:${missionId}:goal`, data.learnTopic)
 
             toast("Mission created", {
             description: (

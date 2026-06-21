@@ -25,26 +25,36 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
 import { useParams } from "next/navigation";
 
+type SourceMode = "web" | "user_material" | "both";
 
-const learningContent = [
+type PlanRequest = {
+    goal: string;
+    source_mode: SourceMode;
+    user_material?: string;
+}
+
+
+const sourceMode = [
     {
-        id: "search",
+        id: "web",
         title: "Search for high quality resources",
     },
     {
-        id: "upload",
+        id: "user_material",
         title: "I'll add my own material",
     },
     {
-        id: "search_and_upload",
+        id: "both",
         title: "Both",
     },
 ] as const
 
 
 const formSchema = z.object({
-    learningContent: z.string().min(1, "Choose your learning resources."),
-    optionalResources: z.string().max(2000, "Keep this under 2000 characters.").optional(),
+    sourceMode: z.enum(["web", "user_material", "both"], {
+        message: "Choose your learning resources"
+    }),
+    userMaterial: z.string().max(2000, "Keep this under 2000 characters.").optional(),
 });
 
 
@@ -53,24 +63,45 @@ export default function Page() {
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: {
-            learningContent: 'search',
-            optionalResources: '',
+            sourceMode: 'web',
+            userMaterial: '',
         },
     })
 
 
-    function onSubmit(data: z.infer<typeof formSchema>) {
+    async function onSubmit(data: z.infer<typeof formSchema>) {
         try {
-            const payload = {
-                missionId: params.missionId,
-                learningContent: data.learningContent,
-                optionalResources: data.optionalResources,
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
+            const goal =
+                window.sessionStorage.getItem(`mission:${params.missionId}:goal`) ??
+                "learn Rubik's cube"
+            const payload: PlanRequest = {
+                goal,
+                source_mode: data.sourceMode,
+                user_material: data.userMaterial || undefined,
             }
 
-            toast("Learning content noted", {
+            const response = await fetch(
+                `${apiUrl.replace(/\/$/, "")}/api/missions/${params.missionId}/plan`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(payload),
+                }
+            )
+
+            if (!response.ok) {
+                throw new Error(`Failed to generate mission plan: ${response.status}`)
+            }
+
+            const plan = await response.json()
+
+            toast("Mission plan generated", {
                 description: (
                     <pre className="mt-2 w-[320px] overflow-x-auto rounded-md bg-code p-4 text-code-foreground">
-                        <code>{JSON.stringify(payload, null, 2)}</code>
+                        <code>{JSON.stringify(plan, null, 2)}</code>
                     </pre>
                 ),
                 position: "bottom-right",
@@ -99,7 +130,7 @@ export default function Page() {
                     <form id="mission-plan-form" onSubmit={form.handleSubmit(onSubmit)}>
                         <FieldGroup>
                             <Controller
-                                name="learningContent"
+                                name="sourceMode"
                                 control={form.control}
                                 render={({ field, fieldState }) => (
                                     <Field data-invalid={fieldState.invalid}>
@@ -109,7 +140,7 @@ export default function Page() {
                                             value={field.value}
                                             className="flex flex-col gap-3"
                                         >
-                                            {learningContent.map((preference) => {
+                                            {sourceMode.map((preference) => {
                                                 const id = `learning-content-${preference.id}`
 
                                                 return (
@@ -125,7 +156,7 @@ export default function Page() {
                                 )}
                             />
                             <Controller
-                                name="optionalResources"
+                                name="userMaterial"
                                 control={form.control}
                                 render={({ field, fieldState }) => (
                                     <Field data-invalid={fieldState.invalid}>
