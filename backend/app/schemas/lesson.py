@@ -20,8 +20,13 @@ class LessonArtifact(BaseModel):
     lesson_id: str
     objective_id: str
     title: str
-    estimated_minutes: int = Field(ge=1)
     lesson_html: str
     key_points: list[str] = Field(default_factory=list)
     practical_task: PracticalTask | None = None
     assessment: Assessment
+
+
+class LessonStartResponse(BaseModel):
+    mission_id: str
+    objective_id: str
+    lesson: LessonArtifact

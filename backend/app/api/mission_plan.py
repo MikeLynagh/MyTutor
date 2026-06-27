@@ -28,8 +28,7 @@ def create_mission_plan(mission_id: str, payload: MissionPlanRequest):
         selected_sources=[CuratedResource.model_validate(source) for source in curated["selected_sources"]],
         source_summary=curated["source_summary"],
     )
-
-    return MissionPlanResponse(
+    response = MissionPlanResponse(
         mission_id=mission_id,
         selected_sources=curated["selected_sources"],
         rejected_sources=curated["rejected_sources"],
@@ -39,3 +38,5 @@ def create_mission_plan(mission_id: str, payload: MissionPlanRequest):
         objectives=learning_plan.objectives,
         diagnostic_questions=learning_plan.diagnostic_questions,
     )
+    memory_store.save_mission_plan(mission_id, response)
+    return response

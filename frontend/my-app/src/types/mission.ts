@@ -121,11 +121,16 @@ export type LessonArtifact = {
   lesson_id: string;
   objective_id: string;
   title: string;
-  estimated_minutes: number;
   lesson_html: string;
   key_points: string[];
   practical_task?: PracticalTask | null;
   assessment: Assessment;
+};
+
+export type LessonStartResponse = {
+  mission_id: string;
+  objective_id: string;
+  lesson: LessonArtifact;
 };
 
 export type EvaluationResult = {

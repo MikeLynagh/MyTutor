@@ -84,6 +84,85 @@ class MockLLMProvider:
                 }
             )
 
+        if schema_name == "LessonArtifact":
+            objective = prompt_data.get("objective", {})
+            title = objective.get("title", "Lesson")
+            description = objective.get("description", "")
+            success_criteria = objective.get("success_criteria", "")
+            assessment_type = objective.get("assessment_type", "short_written_answer")
+            normalized_goal = str(prompt_data.get("mission_goal", "")).lower()
+
+            if "rubik" in normalized_goal or "cube" in normalized_goal:
+                payload = {
+                    "lesson_id": "draft",
+                    "objective_id": objective.get("id", "obj_1"),
+                    "title": "Cube pieces and notation",
+                    "lesson_html": (
+                        "<article>"
+                        "<h2>Cube pieces and notation</h2>"
+                        "<section><h3>Piece types</h3><p>Centres have one colour, edges have two colours, and corners have three colours.</p></section>"
+                        "<section><h3>Notation</h3><p>R, U, F, L, D, and B are the moves you need first.</p></section>"
+                        "<section><h3>Practice</h3><p>Identify four edge pieces and four corner pieces on your cube.</p></section>"
+                        "</article>"
+                    ),
+                    "key_points": [
+                        "Centres have one colour.",
+                        "Edges have two colours.",
+                        "Corners have three colours.",
+                    ],
+                    "practical_task": {
+                        "instruction": "Pick up your cube and identify four edge pieces and four corner pieces.",
+                        "success_criteria": "The learner can correctly distinguish centre, edge, and corner pieces.",
+                    },
+                    "assessment": {
+                        "type": "short_written_answer",
+                        "question": "Explain the difference between centre, edge, and corner pieces in your own words.",
+                        "expected_answer": "Centres have one colour, edges have two colours, and corners have three colours.",
+                        "rubric": [
+                            "Mentions centres have one colour",
+                            "Mentions edges have two colours",
+                            "Mentions corners have three colours",
+                        ],
+                        "options": [],
+                    },
+                }
+            else:
+                payload = {
+                    "lesson_id": "draft",
+                    "objective_id": objective.get("id", "obj_1"),
+                    "title": title,
+                    "lesson_html": (
+                        "<article>"
+                        f"<h2>{title}</h2>"
+                        f"<p>{description}</p>"
+                        "<section><h3>Key idea</h3><p>Focus on the core concept first, then practice a guided example.</p></section>"
+                        "<section><h3>Practice</h3><p>Complete one small step-by-step example tied to the objective.</p></section>"
+                        "</article>"
+                    ),
+                    "key_points": [
+                        f"Understand the key idea behind {title}.",
+                        "Follow the guided example carefully.",
+                        f"Use the success criteria to check whether you can do {title} independently.",
+                    ],
+                    "practical_task": {
+                        "instruction": f"Complete one guided example related to {title}.",
+                        "success_criteria": success_criteria or f"You can demonstrate the core idea behind {title}.",
+                    },
+                    "assessment": {
+                        "type": assessment_type,
+                        "question": f"Explain or demonstrate the core idea behind {title}.",
+                        "expected_answer": success_criteria or f"You can demonstrate the core idea behind {title}.",
+                        "rubric": [
+                            "Addresses the core idea",
+                            "Matches the objective success criteria",
+                            "Shows the learner can apply the idea",
+                        ],
+                        "options": [],
+                    },
+                }
+
+            return schema.model_validate(payload)
+
         goal = prompt_data.get("mission_goal", "this topic")
         search_results = prompt_data.get("search_results", [])
 

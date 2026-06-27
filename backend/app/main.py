@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import mission_plan, missions
+from app.api import lessons, mission_plan, missions
 
 
 app = FastAPI(title="Adaptive AI Tutor API")
@@ -18,6 +18,7 @@ app.add_middleware(
 
 app.include_router(missions.router, prefix="/api")
 app.include_router(mission_plan.router, prefix="/api")
+app.include_router(lessons.router, prefix="/api")
 
 @app.get("/")
 def read_root():
