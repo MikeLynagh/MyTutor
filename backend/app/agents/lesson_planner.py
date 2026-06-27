@@ -20,7 +20,7 @@ class LessonPlannerAgent:
     ) -> LearningPlan:
         normalized_goal = goal.lower()
 
-        if "rubik" in normalized_goal or "cube" in normalized_goal:
+        if self._is_rubik_mission(normalized_goal):
             return self._build_rubik_plan()
 
         llm_plan = self._generate_plan_with_llm(
@@ -168,9 +168,12 @@ class LessonPlannerAgent:
         selected_sources: list[CuratedResource],
         source_summary: str,
     ) -> LearningPlan | None:
+        learner_level = current_level or "beginner"
         system_prompt = (
             "You are a lesson planner for a learning mission. "
-            "Return a sequenced beginner-appropriate learning plan in valid json only. "
+            f"The learner's current level is {learner_level}. "
+            "Return a sequenced learning plan that is appropriate for that level in valid json only. "
+            "If the learner already has some knowledge or is comfortable, avoid unnecessary remedial beginner objectives. "
             "Use the provided schema exactly. "
             "Do not invent extra fields. "
             "Make prerequisites explicit and keep objective difficulty as a normalized progression hint between 0 and 1."
@@ -178,7 +181,7 @@ class LessonPlannerAgent:
         user_prompt = json.dumps(
             {
                 "mission_goal": goal,
-                "current_level": current_level or "beginner",
+                "current_level": learner_level,
                 "success_criteria": success_criteria or "",
                 "source_summary": source_summary,
                 "selected_sources": [
@@ -265,3 +268,15 @@ class LessonPlannerAgent:
             return "procedural_skill"
 
         return "conceptual_topic"
+
+    def _is_rubik_mission(self, normalized_goal: str) -> bool:
+        rubik_indicators = [
+            "rubik",
+            "rubik's cube",
+            "rubiks cube",
+            "3x3 cube",
+            "solve the cube",
+            "speedcube",
+            "speedcubing",
+        ]
+        return any(indicator in normalized_goal for indicator in rubik_indicators)
