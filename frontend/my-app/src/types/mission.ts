@@ -59,8 +59,13 @@ export type MissionPlanRequest = {
 
 export type MissionPlanResponse = {
   mission_id: string;
-  sources: CuratedResource[];
-  summary: string;
+  selected_sources: CuratedResource[];
+  rejected_sources: RejectedResource[];
+  source_summary: string;
+  recommended_learning_approach: string;
+  mission_type: MissionType;
+  objectives: Objective[];
+  diagnostic_questions: string[];
 };
 
 export type Objective = {
