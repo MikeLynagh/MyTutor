@@ -32,6 +32,58 @@ class MockLLMProvider:
         user_prompt: str,
     ) -> StructuredOutputT:
         prompt_data = json.loads(user_prompt)
+        schema_name = schema.__name__
+
+        if schema_name == "LearningPlan":
+            goal = prompt_data.get("mission_goal", "this topic")
+            normalized_goal = str(goal).lower()
+            if any(keyword in normalized_goal for keyword in ["build", "code", "program", "api", "backend", "frontend", "python"]):
+                mission_type = "technical_skill"
+            elif any(keyword in normalized_goal for keyword in ["learn", "play", "cook", "draw", "write", "speak"]):
+                mission_type = "procedural_skill"
+            else:
+                mission_type = "conceptual_topic"
+
+            return schema.model_validate(
+                {
+                    "mission_type": mission_type,
+                    "objectives": [
+                        {
+                            "id": "obj_1",
+                            "title": f"Understand the foundations of {goal}",
+                            "description": f"Learn the core terms, concepts, and first practical steps for {goal}.",
+                            "difficulty": 0.2,
+                            "assessment_type": "short_written_answer",
+                            "prerequisites": [],
+                            "success_criteria": f"Learner can explain the key foundations of {goal} clearly.",
+                        },
+                        {
+                            "id": "obj_2",
+                            "title": f"Practice a guided workflow for {goal}",
+                            "description": f"Work through a guided example or structured practice sequence for {goal}.",
+                            "difficulty": 0.55,
+                            "assessment_type": "practical_check",
+                            "prerequisites": ["obj_1"],
+                            "success_criteria": f"Learner can complete a guided practice flow for {goal} and explain each step.",
+                        },
+                        {
+                            "id": "obj_3",
+                            "title": f"Apply {goal} independently",
+                            "description": f"Complete a small independent task that demonstrates working ability in {goal}.",
+                            "difficulty": 0.85,
+                            "assessment_type": "practical_check",
+                            "prerequisites": ["obj_2"],
+                            "success_criteria": f"Learner can complete a small independent task in {goal} with minimal support.",
+                        },
+                    ],
+                    "diagnostic_questions": [
+                        f"What experience do you already have with {goal}?",
+                        f"What part of {goal} feels most unfamiliar right now?",
+                        f"What would a successful first practical win in {goal} look like for you?",
+                    ],
+                }
+            )
+
         goal = prompt_data.get("mission_goal", "this topic")
         search_results = prompt_data.get("search_results", [])
 
