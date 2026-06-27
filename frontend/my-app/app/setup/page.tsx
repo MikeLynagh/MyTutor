@@ -24,35 +24,41 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useRouter } from "next/navigation";
+import type {
+    CurrentLevel,
+    LearningPreference,
+    Mission,
+    MissionCreate,
+} from "@/types/mission";
 
 
 
 const learningLevel = [
     {
-        id: "beginner",
+        id: "beginner" as CurrentLevel,
         title: "Beginner",
     },
     {
-        id: "some_knowledge",
+        id: "some_knowledge" as CurrentLevel,
         title: "Some Knowledge",
     },
     {
-        id: "comfortable",
+        id: "comfortable" as CurrentLevel,
         title: "Comfortable",
     },
 ] as const
 
 const learningStyle = [
     {
-        id: "short",
+        id: "short" as LearningPreference,
         title: "Short Explanations",
     },
     {
-        id: "quiz_often",
+        id: "quiz_often" as LearningPreference,
         title: "Quiz me often",
     },
     {
-        id: "step_by_step",
+        id: "step_by_step" as LearningPreference,
         title: "Step by Step",
     },
 ] as const
@@ -92,12 +98,12 @@ export default function Page() {
 
     async function onSubmit(data: z.infer<typeof formSchema>) {
         try {
-            const payload = {
+            const payload: MissionCreate = {
                 goal: data.learnTopic,
                 why: data.motivationTopic,
                 success_criteria: data.successDefined,
-                current_level: data.currentLevel,
-                learning_preference: data.learningStyle,
+                current_level: data.currentLevel as CurrentLevel,
+                learning_preference: data.learningStyle as LearningPreference,
                 source_mode: "web",
             }
 
@@ -115,10 +121,11 @@ export default function Page() {
                 throw new Error(`Failed to create mission: ${response.status}`)
             }
 
-            const mission = await response.json()
+            const mission: Mission = await response.json()
 
             const missionId = mission.id;
             window.sessionStorage.setItem(`mission:${missionId}:goal`, data.learnTopic)
+            window.sessionStorage.setItem(`mission:${missionId}`, JSON.stringify(mission))
 
             toast("Mission created", {
             description: (
