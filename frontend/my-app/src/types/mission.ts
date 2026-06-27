@@ -51,6 +51,20 @@ export type Mission = {
   mission_type: MissionType;
 };
 
+export type MissionPlanRequest = {
+  goal: string;
+  source_mode: SourceMode;
+  user_material?: string;
+};
+
+export type MissionPlanResponse = {
+  mission_id: string;
+  selected_sources: CuratedResource[];
+  rejected_sources: RejectedResource[];
+  source_summary: string;
+  recommended_learning_approach: string;
+};
+
 export type Objective = {
   id: string;
   title: string;

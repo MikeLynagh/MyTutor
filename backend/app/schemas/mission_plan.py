@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
 from app.schemas.mission import SourceMode
-from app.schemas.resources import CuratedResource
+from app.schemas.resources import CuratedResource, RejectedResource
 
 
 class MissionPlanRequest(BaseModel):
@@ -12,5 +12,7 @@ class MissionPlanRequest(BaseModel):
 
 class MissionPlanResponse(BaseModel):
     mission_id: str
-    sources: list[CuratedResource]
-    summary: str
+    selected_sources: list[CuratedResource]
+    rejected_sources: list[RejectedResource]
+    source_summary: str
+    recommended_learning_approach: str

@@ -24,27 +24,20 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
 import { useParams } from "next/navigation";
-
-type SourceMode = "web" | "user_material" | "both";
-
-type PlanRequest = {
-    goal: string;
-    source_mode: SourceMode;
-    user_material?: string;
-}
+import type { MissionPlanRequest, MissionPlanResponse, SourceMode } from "@/types/mission";
 
 
 const sourceMode = [
     {
-        id: "web",
+        id: "web" as SourceMode,
         title: "Search for high quality resources",
     },
     {
-        id: "user_material",
+        id: "user_material" as SourceMode,
         title: "I'll add my own material",
     },
     {
-        id: "both",
+        id: "both" as SourceMode,
         title: "Both",
     },
 ] as const
@@ -75,9 +68,9 @@ export default function Page() {
             const goal =
                 window.sessionStorage.getItem(`mission:${params.missionId}:goal`) ??
                 "learn Rubik's cube"
-            const payload: PlanRequest = {
+            const payload: MissionPlanRequest = {
                 goal,
-                source_mode: data.sourceMode,
+                source_mode: data.sourceMode as SourceMode,
                 user_material: data.userMaterial || undefined,
             }
 
@@ -96,7 +89,7 @@ export default function Page() {
                 throw new Error(`Failed to generate mission plan: ${response.status}`)
             }
 
-            const plan = await response.json()
+            const plan: MissionPlanResponse = await response.json()
 
             toast("Mission plan generated", {
                 description: (
