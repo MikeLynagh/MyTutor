@@ -24,7 +24,12 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
 import { useParams } from "next/navigation";
-import type { MissionPlanRequest, MissionPlanResponse, SourceMode } from "@/types/mission";
+import type {
+    Mission,
+    MissionPlanRequest,
+    MissionPlanResponse,
+    SourceMode,
+} from "@/types/mission";
 
 
 const sourceMode = [
@@ -53,6 +58,8 @@ const formSchema = z.object({
 
 export default function Page() {
     const params = useParams<{ missionId: string }>();
+    const [mission, setMission] = React.useState<Mission | null>(null);
+    const [isLoadingMission, setIsLoadingMission] = React.useState(true);
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: {
@@ -61,15 +68,45 @@ export default function Page() {
         },
     })
 
+    React.useEffect(() => {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
+
+        async function loadMission() {
+            try {
+                const response = await fetch(
+                    `${apiUrl.replace(/\/$/, "")}/api/missions/${params.missionId}`
+                )
+
+                if (!response.ok) {
+                    throw new Error(`Failed to load mission: ${response.status}`)
+                }
+
+                const missionResponse: Mission = await response.json()
+                setMission(missionResponse)
+            } catch (error) {
+                console.error("failed to load mission", error)
+                toast("Could not load mission", {
+                    description: "Reload from the mission setup screen and try again.",
+                    position: "bottom-right",
+                })
+            } finally {
+                setIsLoadingMission(false)
+            }
+        }
+
+        void loadMission()
+    }, [params.missionId])
+
 
     async function onSubmit(data: z.infer<typeof formSchema>) {
         try {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
-            const goal =
-                window.sessionStorage.getItem(`mission:${params.missionId}:goal`) ??
-                "learn Rubik's cube"
+            if (!mission) {
+                throw new Error("Mission is not loaded")
+            }
+
             const payload: MissionPlanRequest = {
-                goal,
+                goal: mission.goal,
                 source_mode: data.sourceMode as SourceMode,
                 user_material: data.userMaterial || undefined,
             }
@@ -180,7 +217,7 @@ export default function Page() {
                     <Button type="button" variant="outline" onClick={() => form.reset()}>
                         Reset
                     </Button>
-                    <Button type="submit" form="mission-plan-form">
+                    <Button type="submit" form="mission-plan-form" disabled={isLoadingMission}>
                         Generate Mission Plan
                     </Button>
                 </CardFooter>
