@@ -4,6 +4,7 @@ from app.agents.lesson_generator import LessonGeneratorAgent
 from app.agents.lesson_planner import LessonPlannerAgent
 from app.models.memory_store import memory_store
 from app.schemas.lesson import LessonStartResponse
+from app.schemas.mission_plan import MissionPlanResponse
 
 router = APIRouter()
 
@@ -26,6 +27,17 @@ def start_lesson(mission_id: str):
             selected_sources=[],
             source_summary="",
         )
+        mission_plan = MissionPlanResponse(
+            mission_id=mission_id,
+            selected_sources=[],
+            rejected_sources=[],
+            source_summary="",
+            recommended_learning_approach="guided_foundations",
+            mission_type=learning_plan.mission_type,
+            objectives=learning_plan.objectives,
+            diagnostic_questions=learning_plan.diagnostic_questions,
+        )
+        memory_store.save_mission_plan(mission_id, mission_plan)
         objective = learning_plan.objectives[0]
         source_summary = ""
     else:
