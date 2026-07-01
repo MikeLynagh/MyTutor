@@ -27,9 +27,9 @@ import { useRouter } from "next/navigation";
 import type {
     CurrentLevel,
     LearningPreference,
-    Mission,
     MissionCreate,
 } from "@/types/mission";
+import { missionSchema } from "@/types/mission";
 
 
 
@@ -121,7 +121,7 @@ export default function Page() {
                 throw new Error(`Failed to create mission: ${response.status}`)
             }
 
-            const mission: Mission = await response.json()
+            const mission = missionSchema.parse(await response.json())
 
             const missionId = mission.id;
             window.sessionStorage.setItem(`mission:${missionId}:goal`, data.learnTopic)

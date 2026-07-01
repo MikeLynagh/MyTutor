@@ -23,13 +23,13 @@ import {
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import type {
     Mission,
     MissionPlanRequest,
-    MissionPlanResponse,
     SourceMode,
 } from "@/types/mission";
+import { missionPlanResponseSchema, missionSchema } from "@/types/mission";
 
 
 const sourceMode = [
@@ -58,6 +58,7 @@ const formSchema = z.object({
 
 export default function Page() {
     const params = useParams<{ missionId: string }>();
+    const router = useRouter();
     const [mission, setMission] = React.useState<Mission | null>(null);
     const [isLoadingMission, setIsLoadingMission] = React.useState(true);
     const form = useForm<z.infer<typeof formSchema>>({
@@ -81,7 +82,7 @@ export default function Page() {
                     throw new Error(`Failed to load mission: ${response.status}`)
                 }
 
-                const missionResponse: Mission = await response.json()
+                const missionResponse = missionSchema.parse(await response.json())
                 setMission(missionResponse)
             } catch (error) {
                 console.error("failed to load mission", error)
@@ -126,16 +127,14 @@ export default function Page() {
                 throw new Error(`Failed to generate mission plan: ${response.status}`)
             }
 
-            const plan: MissionPlanResponse = await response.json()
+            const plan = missionPlanResponseSchema.parse(await response.json())
+            window.sessionStorage.setItem(`mission:${params.missionId}:plan`, JSON.stringify(plan))
 
             toast("Mission plan generated", {
-                description: (
-                    <pre className="mt-2 w-[320px] overflow-x-auto rounded-md bg-code p-4 text-code-foreground">
-                        <code>{JSON.stringify(plan, null, 2)}</code>
-                    </pre>
-                ),
+                description: "Opening the mission workspace.",
                 position: "bottom-right",
             })
+            router.push(`/missions/${params.missionId}/plan`)
         }
         catch (error) {
             console.error('saved to fail form data', error)

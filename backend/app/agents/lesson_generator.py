@@ -115,7 +115,7 @@ class LessonGeneratorAgent:
         recent_errors: list[str],
     ) -> LessonArtifact:
         normalized_goal = mission_goal.lower()
-        if "rubik" in normalized_goal or "cube" in normalized_goal:
+        if self._is_rubik_mission(normalized_goal):
             return self._build_rubik_objective_one_fallback(lesson_id=lesson_id, objective=objective, recent_errors=recent_errors)
 
         lesson_html = (
@@ -207,6 +207,18 @@ class LessonGeneratorAgent:
                 ],
             ),
         )
+
+    def _is_rubik_mission(self, normalized_goal: str) -> bool:
+        rubik_indicators = [
+            "rubik",
+            "rubik's cube",
+            "rubiks cube",
+            "3x3 cube",
+            "solve the cube",
+            "speedcube",
+            "speedcubing",
+        ]
+        return any(indicator in normalized_goal for indicator in rubik_indicators)
 
     def _is_valid_lesson(self, lesson: LessonArtifact) -> bool:
         if not lesson.lesson_id.strip() or not lesson.objective_id.strip() or not lesson.title.strip():

@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from app.schemas.mission import SourceMode
+from app.schemas.mission import MissionType, SourceMode
 from app.schemas.plan import Objective
 from app.schemas.resources import CuratedResource, RejectedResource
 
@@ -17,6 +17,6 @@ class MissionPlanResponse(BaseModel):
     rejected_sources: list[RejectedResource]
     source_summary: str
     recommended_learning_approach: str
-    mission_type: str
+    mission_type: MissionType
     objectives: list[Objective]
     diagnostic_questions: list[str]

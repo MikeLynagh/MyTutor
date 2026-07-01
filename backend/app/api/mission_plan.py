@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from app.agents.lesson_planner import LessonPlannerAgent
 from app.agents.resource_curator import ResourceCuratorAgent
@@ -10,6 +10,17 @@ router = APIRouter()
 
 resource_curator = ResourceCuratorAgent()
 lesson_planner = LessonPlannerAgent()
+
+
+@router.get("/missions/{mission_id}/plan", response_model=MissionPlanResponse)
+def get_mission_plan(mission_id: str):
+    mission_plan = memory_store.get_mission_plan(mission_id)
+
+    if mission_plan is None:
+        raise HTTPException(status_code=404, detail="Mission plan not found")
+
+    return mission_plan
+
 
 @router.post("/missions/{mission_id}/plan", response_model=MissionPlanResponse)
 def create_mission_plan(mission_id: str, payload: MissionPlanRequest):

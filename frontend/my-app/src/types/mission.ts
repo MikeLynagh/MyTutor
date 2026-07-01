@@ -1,162 +1,189 @@
-export type CurrentLevel = "beginner" | "some_knowledge" | "comfortable";
+import { z } from "zod";
 
-export type LearningPreference = "short" | "quiz_often" | "step_by_step";
+export const currentLevelSchema = z.enum(["beginner", "some_knowledge", "comfortable"]);
 
-export type SourceMode = "web" | "user_material" | "both";
+export const learningPreferenceSchema = z.enum(["short", "quiz_often", "step_by_step"]);
 
-export type MissionType =
-  | "procedural_skill"
-  | "technical_skill"
-  | "conceptual_topic"
-  | "interview_prep";
+export const sourceModeSchema = z.enum(["web", "user_material", "both"]);
 
-export type ResourceType =
-  | "article"
-  | "video"
-  | "documentation"
-  | "guide"
-  | "user_material"
-  | "other";
+export const missionTypeSchema = z.enum([
+  "procedural_skill",
+  "technical_skill",
+  "conceptual_topic",
+  "interview_prep",
+]);
 
-export type AssessmentType =
-  | "short_written_answer"
-  | "multiple_choice"
-  | "practical_check"
-  | "free_form";
+export const resourceTypeSchema = z.enum([
+  "article",
+  "video",
+  "documentation",
+  "guide",
+  "user_material",
+  "other",
+]);
 
-export type NextActionType =
-  | "remediate"
-  | "repeat_with_new_example"
-  | "practical_check"
-  | "advance";
+export const assessmentTypeSchema = z.enum([
+  "short_written_answer",
+  "multiple_choice",
+  "practical_check",
+  "free_form",
+]);
 
-export type MissionCreate = {
-  goal: string;
-  why: string;
-  success_criteria: string;
-  current_level: CurrentLevel;
-  learning_preference: LearningPreference;
-  source_mode: SourceMode;
-};
+export const nextActionTypeSchema = z.enum([
+  "remediate",
+  "repeat_with_new_example",
+  "practical_check",
+  "advance",
+]);
 
-export type Mission = {
-  id: string;
-  title: string;
-  goal: string;
-  why: string;
-  success_criteria: string;
-  current_level: CurrentLevel;
-  learning_preference: LearningPreference;
-  source_mode: SourceMode;
-  mission_type: MissionType;
-};
+export const missionCreateSchema = z.object({
+  goal: z.string(),
+  why: z.string(),
+  success_criteria: z.string(),
+  current_level: currentLevelSchema,
+  learning_preference: learningPreferenceSchema,
+  source_mode: sourceModeSchema,
+});
 
-export type MissionPlanRequest = {
-  goal: string;
-  source_mode: SourceMode;
-  user_material?: string;
-};
+export const missionSchema = missionCreateSchema.extend({
+  id: z.string(),
+  title: z.string(),
+  mission_type: missionTypeSchema,
+});
 
-export type MissionPlanResponse = {
-  mission_id: string;
-  selected_sources: CuratedResource[];
-  rejected_sources: RejectedResource[];
-  source_summary: string;
-  recommended_learning_approach: string;
-  mission_type: MissionType;
-  objectives: Objective[];
-  diagnostic_questions: string[];
-};
+export const missionPlanRequestSchema = z.object({
+  goal: z.string(),
+  source_mode: sourceModeSchema,
+  user_material: z.string().optional(),
+});
 
-export type Objective = {
-  id: string;
-  title: string;
-  description: string;
-  difficulty: number;
-  assessment_type: AssessmentType;
-  prerequisites: string[];
-  success_criteria: string;
-};
+export const objectiveSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string(),
+  difficulty: z.number().min(0).max(1),
+  assessment_type: assessmentTypeSchema,
+  prerequisites: z.array(z.string()),
+  success_criteria: z.string(),
+});
 
-export type CuratedResource = {
-  title: string;
-  url: string;
-  type: ResourceType;
-  reason: string;
-};
+export const curatedResourceSchema = z.object({
+  title: z.string(),
+  url: z.string(),
+  type: resourceTypeSchema,
+  reason: z.string(),
+});
 
-export type RejectedResource = {
-  title: string;
-  url: string;
-  reason: string;
-};
+export const rejectedResourceSchema = z.object({
+  title: z.string(),
+  url: z.string(),
+  reason: z.string(),
+});
 
-export type CuratedResourceBundle = {
-  selected_sources: CuratedResource[];
-  rejected_sources: RejectedResource[];
-  source_summary: string;
-  recommended_learning_approach: string;
-};
+export const curatedResourceBundleSchema = z.object({
+  selected_sources: z.array(curatedResourceSchema),
+  rejected_sources: z.array(rejectedResourceSchema),
+  source_summary: z.string(),
+  recommended_learning_approach: z.string(),
+});
 
-export type LearningPlan = {
-  mission_type: MissionType;
-  objectives: Objective[];
-  diagnostic_questions: string[];
-};
+export const learningPlanSchema = z.object({
+  mission_type: missionTypeSchema,
+  objectives: z.array(objectiveSchema),
+  diagnostic_questions: z.array(z.string()),
+});
 
-export type Assessment = {
-  type: AssessmentType;
-  question: string;
-  expected_answer?: string | null;
-  rubric: string[];
-  options: string[];
-};
+export const missionPlanResponseSchema = curatedResourceBundleSchema
+  .merge(learningPlanSchema)
+  .extend({
+    mission_id: z.string(),
+  });
 
-export type PracticalTask = {
-  instruction: string;
-  success_criteria: string;
-};
+export const assessmentSchema = z.object({
+  type: assessmentTypeSchema,
+  question: z.string(),
+  expected_answer: z.string().nullable().optional(),
+  rubric: z.array(z.string()),
+  options: z.array(z.string()),
+});
 
-export type LessonArtifact = {
-  lesson_id: string;
-  objective_id: string;
-  title: string;
-  lesson_html: string;
-  key_points: string[];
-  practical_task?: PracticalTask | null;
-  assessment: Assessment;
-};
+export const practicalTaskSchema = z.object({
+  instruction: z.string(),
+  success_criteria: z.string(),
+});
 
-export type LessonStartResponse = {
-  mission_id: string;
-  objective_id: string;
-  lesson: LessonArtifact;
-};
+export const lessonArtifactSchema = z.object({
+  lesson_id: z.string(),
+  objective_id: z.string(),
+  title: z.string(),
+  lesson_html: z.string(),
+  key_points: z.array(z.string()),
+  practical_task: practicalTaskSchema.nullable().optional(),
+  assessment: assessmentSchema,
+});
 
-export type EvaluationResult = {
-  is_correct: boolean;
-  score: number;
-  feedback: string;
-  misconception?: string | null;
-  missing_points: string[];
-  next_hint?: string | null;
-};
+export const lessonStartResponseSchema = z.object({
+  mission_id: z.string(),
+  objective_id: z.string(),
+  lesson: lessonArtifactSchema,
+});
 
-export type MasteryState = {
-  objective_id: string;
-  p_mastery: number;
-  attempts: number;
-  recent_errors: string[];
-  last_feedback?: string | null;
-};
+export const evaluationResultSchema = z.object({
+  is_correct: z.boolean(),
+  score: z.number().min(0).max(1),
+  feedback: z.string(),
+  misconception: z.string().nullable().optional(),
+  missing_points: z.array(z.string()),
+  next_hint: z.string().nullable().optional(),
+});
 
-export type MasteryUpdate = {
-  objective_id: string;
-  mastery_before: number;
-  mastery_after: number;
-};
+export const masteryStateSchema = z.object({
+  objective_id: z.string(),
+  p_mastery: z.number().min(0).max(1),
+  attempts: z.number().int().min(0),
+  recent_errors: z.array(z.string()),
+  last_feedback: z.string().nullable().optional(),
+});
 
-export type NextAction = {
-  type: NextActionType;
-  reason: string;
-};
+export const masteryUpdateSchema = z.object({
+  objective_id: z.string(),
+  mastery_before: z.number().min(0).max(1),
+  mastery_after: z.number().min(0).max(1),
+});
+
+export const nextActionSchema = z.object({
+  type: nextActionTypeSchema,
+  reason: z.string(),
+});
+
+export const answerEvaluationResponseSchema = z.object({
+  evaluation: evaluationResultSchema,
+  mastery: masteryUpdateSchema,
+  next_action: nextActionSchema,
+});
+
+export type CurrentLevel = z.infer<typeof currentLevelSchema>;
+export type LearningPreference = z.infer<typeof learningPreferenceSchema>;
+export type SourceMode = z.infer<typeof sourceModeSchema>;
+export type MissionType = z.infer<typeof missionTypeSchema>;
+export type ResourceType = z.infer<typeof resourceTypeSchema>;
+export type AssessmentType = z.infer<typeof assessmentTypeSchema>;
+export type NextActionType = z.infer<typeof nextActionTypeSchema>;
+export type MissionCreate = z.infer<typeof missionCreateSchema>;
+export type Mission = z.infer<typeof missionSchema>;
+export type MissionPlanRequest = z.infer<typeof missionPlanRequestSchema>;
+export type MissionPlanResponse = z.infer<typeof missionPlanResponseSchema>;
+export type Objective = z.infer<typeof objectiveSchema>;
+export type CuratedResource = z.infer<typeof curatedResourceSchema>;
+export type RejectedResource = z.infer<typeof rejectedResourceSchema>;
+export type CuratedResourceBundle = z.infer<typeof curatedResourceBundleSchema>;
+export type LearningPlan = z.infer<typeof learningPlanSchema>;
+export type Assessment = z.infer<typeof assessmentSchema>;
+export type PracticalTask = z.infer<typeof practicalTaskSchema>;
+export type LessonArtifact = z.infer<typeof lessonArtifactSchema>;
+export type LessonStartResponse = z.infer<typeof lessonStartResponseSchema>;
+export type EvaluationResult = z.infer<typeof evaluationResultSchema>;
+export type MasteryState = z.infer<typeof masteryStateSchema>;
+export type MasteryUpdate = z.infer<typeof masteryUpdateSchema>;
+export type NextAction = z.infer<typeof nextActionSchema>;
+export type AnswerEvaluationResponse = z.infer<typeof answerEvaluationResponseSchema>;
