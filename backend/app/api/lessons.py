@@ -13,7 +13,7 @@ lesson_planner = LessonPlannerAgent()
 
 
 @router.post("/missions/{mission_id}/lessons/start", response_model=LessonStartResponse)
-def start_lesson(mission_id: str):
+def start_lesson(mission_id: str, force: bool = False):
     mission = memory_store.get_mission(mission_id)
     if mission is None:
         raise HTTPException(status_code=404, detail="Mission not found")
@@ -45,7 +45,7 @@ def start_lesson(mission_id: str):
         source_summary = mission_plan.source_summary
 
     existing_lesson = memory_store.get_lesson(mission_id, objective.id)
-    if existing_lesson is not None:
+    if existing_lesson is not None and not force:
         return LessonStartResponse(mission_id=mission_id, objective_id=objective.id, lesson=existing_lesson)
 
     lesson = lesson_generator.generate_lesson(

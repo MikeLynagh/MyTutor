@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, RefreshCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,6 +23,7 @@ export default function MissionLessonPage() {
   const [mission, setMission] = React.useState<Mission | null>(null);
   const [lessonResponse, setLessonResponse] = React.useState<LessonStartResponse | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [isRegenerating, setIsRegenerating] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [answer, setAnswer] = React.useState("");
 
@@ -89,6 +90,36 @@ export default function MissionLessonPage() {
     void loadLesson();
   }, [params.missionId]);
 
+  async function regenerateLesson() {
+    const apiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
+    const missionId = params.missionId;
+
+    setIsRegenerating(true);
+    try {
+      const response = await fetch(`${apiUrl}/api/missions/${missionId}/lessons/start?force=true`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to regenerate lesson: ${response.status}`);
+      }
+
+      const lessonData = lessonStartResponseSchema.parse(await response.json());
+      setLessonResponse(lessonData);
+      setAnswer("");
+      window.sessionStorage.setItem(lessonStorageKey(missionId), JSON.stringify(lessonData));
+      setError(null);
+    } catch (regenerateError) {
+      console.error("failed to regenerate lesson", regenerateError);
+      setError("Could not regenerate the lesson.");
+    } finally {
+      setIsRegenerating(false);
+    }
+  }
+
   if (isLoading && !lessonResponse) {
     return (
       <div className="flex min-h-[360px] items-center justify-center">
@@ -118,8 +149,21 @@ export default function MissionLessonPage() {
 
   return (
     <div className="max-w-2xl">
-      <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-indigo-600">
-        <span>Lesson 1</span>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-indigo-600">
+          <span>Lesson 1</span>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 gap-1 border-slate-200 text-xs text-slate-600 hover:bg-slate-50"
+          onClick={regenerateLesson}
+          disabled={isRegenerating}
+        >
+          <RefreshCcw className={isRegenerating ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
+          Regenerate
+        </Button>
       </div>
       <h1 className="mb-4 text-2xl font-bold leading-tight text-slate-800">
         {lessonResponse.lesson.title}

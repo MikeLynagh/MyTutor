@@ -22,7 +22,7 @@ class LessonArtifact(BaseModel):
     title: str
     lesson_html: str
     key_points: list[str] = Field(default_factory=list)
-    practical_task: PracticalTask | None = None
+    practical_task: PracticalTask
     assessment: Assessment
 
 

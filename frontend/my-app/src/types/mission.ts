@@ -118,7 +118,7 @@ export const lessonArtifactSchema = z.object({
   title: z.string(),
   lesson_html: z.string(),
   key_points: z.array(z.string()),
-  practical_task: practicalTaskSchema.nullable().optional(),
+  practical_task: practicalTaskSchema,
   assessment: assessmentSchema,
 });
 

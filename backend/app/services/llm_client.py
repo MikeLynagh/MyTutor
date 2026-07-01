@@ -215,12 +215,12 @@ class DeepSeekProvider:
         api_key: str,
         model: str | None = None,
         base_url: str | None = None,
-        timeout_seconds: float = 30.0,
+        timeout_seconds: float | None = None,
     ) -> None:
         self.api_key = api_key
         self.model = model or os.getenv("DEEPSEEK_MODEL", "deepseek-v4-pro")
         self.base_url = (base_url or os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")).rstrip("/")
-        self.timeout_seconds = timeout_seconds
+        self.timeout_seconds = timeout_seconds or float(os.getenv("LLM_TIMEOUT_SECONDS", "60"))
 
     def generate_structured(
         self,
@@ -256,8 +256,14 @@ class DeepSeekProvider:
                 timeout=self.timeout_seconds,
             )
             response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            raise LLMClientError(
+                f"DeepSeek request failed with status {exc.response.status_code}: {exc.response.text[:500]}"
+            ) from exc
+        except httpx.TimeoutException as exc:
+            raise LLMClientError(f"DeepSeek request timed out after {self.timeout_seconds} seconds") from exc
         except httpx.HTTPError as exc:
-            raise LLMClientError("DeepSeek request failed") from exc
+            raise LLMClientError(f"DeepSeek request failed: {exc}") from exc
 
         response_json = response.json()
         content = response_json["choices"][0]["message"]["content"]

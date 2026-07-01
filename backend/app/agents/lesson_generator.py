@@ -1,4 +1,5 @@
 import json
+import logging
 from uuid import uuid4
 
 from app.schemas.lesson import Assessment, LessonArtifact, PracticalTask
@@ -6,6 +7,8 @@ from app.schemas.mission import CurrentLevel, LearningPreference
 from app.schemas.plan import Objective
 from app.services.lesson_sanitizer import LessonSanitizer
 from app.services.llm_client import LLMClient, LLMClientError
+
+logger = logging.getLogger(__name__)
 
 
 class LessonGeneratorAgent:
@@ -38,6 +41,7 @@ class LessonGeneratorAgent:
             generated.lesson_html = self.sanitizer.sanitize(generated.lesson_html)
             if self._is_valid_lesson(generated):
                 return generated
+            logger.warning("LLM lesson output failed validation for objective %s", objective.id)
 
         fallback = self._build_fallback_lesson(
             lesson_id=lesson_id,
@@ -103,7 +107,8 @@ class LessonGeneratorAgent:
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
             )
-        except LLMClientError:
+        except LLMClientError as exc:
+            logger.warning("LLM lesson generation failed: %s", exc)
             return None
 
     def _build_fallback_lesson(
