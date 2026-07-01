@@ -67,7 +67,10 @@ class LessonGeneratorAgent:
             "Use only the supplied objective and context. "
             "Do not change the objective. "
             "Return valid json only and follow the schema exactly. "
-            "Keep the lesson concise, stepwise, and aligned to the assessment."
+            "Keep the lesson concise, stepwise, and aligned to the assessment. "
+            "Use safe semantic HTML to reduce cognitive load when useful. "
+            "Visual structure should clarify comparisons, sequences, examples, checks, diagrams, tables, or callouts. "
+            "Do not add decorative visuals."
         )
         user_prompt = json.dumps(
             {
@@ -92,10 +95,52 @@ class LessonGeneratorAgent:
                         "code",
                         "pre",
                         "blockquote",
+                        "figure",
+                        "figcaption",
+                        "table",
+                        "thead",
+                        "tbody",
+                        "tr",
+                        "th",
+                        "td",
+                        "hr",
+                        "div",
+                        "span",
+                    ],
+                    "allowed_css_classes": [
+                        "lesson-callout",
+                        "lesson-example",
+                        "lesson-check",
+                        "lesson-sequence",
+                        "lesson-comparison",
+                        "lesson-diagram",
+                        "lesson-muted",
+                        "lesson-label",
+                    ],
+                    "visual_patterns": [
+                        "comparison",
+                        "step_sequence",
+                        "checklist",
+                        "table",
+                        "callout",
+                        "worked_example",
+                        "diagram_placeholder",
+                        "code_block",
                     ],
                     "practical_task_required": True,
                     "assessment_alignment_required": True,
                     "one_concrete_example_max": True,
+                    "do_not_include": [
+                        "script",
+                        "iframe",
+                        "style",
+                        "form",
+                        "input",
+                        "button",
+                        "event_handlers",
+                        "external_embeds",
+                        "decorative_images",
+                    ],
                 },
             },
             indent=2,

@@ -128,3 +128,105 @@
     @apply font-sans;
   }
 }
+
+@layer components {
+  .lesson-html {
+    @apply text-sm leading-relaxed text-slate-600;
+  }
+
+  .lesson-html h2 {
+    @apply mb-2 mt-6 text-lg font-semibold text-slate-800;
+  }
+
+  .lesson-html h3 {
+    @apply mb-2 mt-5 text-base font-semibold text-slate-800;
+  }
+
+  .lesson-html p {
+    @apply mt-3;
+  }
+
+  .lesson-html ul {
+    @apply mt-2 list-disc space-y-1 pl-5;
+  }
+
+  .lesson-html ol {
+    @apply mt-2 list-decimal space-y-1 pl-5;
+  }
+
+  .lesson-html li {
+    @apply pl-1;
+  }
+
+  .lesson-html strong {
+    @apply font-semibold text-slate-800;
+  }
+
+  .lesson-html code {
+    @apply rounded bg-slate-100 px-1 py-0.5 text-xs;
+  }
+
+  .lesson-html pre {
+    @apply mt-3 overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs text-slate-100;
+  }
+
+  .lesson-html blockquote {
+    @apply mt-4 border-l-2 border-indigo-200 pl-4 text-slate-500;
+  }
+
+  .lesson-html figure {
+    @apply mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4;
+  }
+
+  .lesson-html figcaption {
+    @apply mt-2 text-xs text-slate-500;
+  }
+
+  .lesson-html table {
+    @apply mt-4 w-full border-collapse text-left;
+  }
+
+  .lesson-html th {
+    @apply border border-slate-200 bg-slate-50 p-2 font-semibold text-slate-800;
+  }
+
+  .lesson-html td {
+    @apply border border-slate-200 p-2;
+  }
+
+  .lesson-html hr {
+    @apply my-6 border-slate-200;
+  }
+
+  .lesson-callout {
+    @apply mt-4 rounded-lg border border-indigo-200 bg-indigo-50/50 px-4 py-3;
+  }
+
+  .lesson-check {
+    @apply mt-4 rounded-lg border border-emerald-200 bg-emerald-50/60 px-4 py-3;
+  }
+
+  .lesson-comparison {
+    @apply mt-4 overflow-hidden rounded-lg border border-slate-200;
+  }
+
+  .lesson-diagram {
+    @apply flex min-h-24 items-center justify-center rounded-md border border-dashed border-slate-300 bg-white p-4 text-center;
+  }
+
+  .lesson-example {
+    @apply mt-4 rounded-lg border border-slate-200 bg-white px-4 py-3;
+  }
+
+  .lesson-label {
+    @apply text-xs font-medium uppercase tracking-wider text-indigo-600;
+  }
+
+  .lesson-muted {
+    @apply text-slate-500;
+  }
+
+  .lesson-sequence {
+    @apply mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3;
+  }
+}

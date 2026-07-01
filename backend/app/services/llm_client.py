@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from typing import Protocol, TypeVar
 
 import httpx
@@ -270,10 +271,7 @@ class DeepSeekProvider:
         if not content:
             raise LLMClientError("DeepSeek returned empty content for structured output")
 
-        try:
-            parsed_json = json.loads(content)
-        except json.JSONDecodeError as exc:
-            raise LLMClientError("DeepSeek returned invalid JSON content") from exc
+        parsed_json = parse_json_content(content)
 
         try:
             return schema.model_validate(parsed_json)
@@ -311,3 +309,29 @@ class LLMClient:
             return DeepSeekProvider(api_key=api_key)
 
         raise LLMClientError(f"Unsupported LLM provider: {selected_provider}")
+
+
+def parse_json_content(content: str):
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        pass
+
+    fenced_match = re.search(r"```(?:json)?\s*(.*?)\s*```", content, flags=re.DOTALL | re.IGNORECASE)
+    if fenced_match:
+        try:
+            return json.loads(fenced_match.group(1))
+        except json.JSONDecodeError:
+            pass
+
+    decoder = json.JSONDecoder()
+    for index, character in enumerate(content):
+        if character not in "{[":
+            continue
+        try:
+            parsed, _ = decoder.raw_decode(content[index:])
+            return parsed
+        except json.JSONDecodeError:
+            continue
+
+    raise LLMClientError("DeepSeek returned invalid JSON content")
