@@ -128,6 +128,17 @@ export const lessonStartResponseSchema = z.object({
   lesson: lessonArtifactSchema,
 });
 
+export const answerSubmissionSchema = z.object({
+  lesson_id: z.string(),
+  objective_id: z.string(),
+  answer: z.string().trim().min(1),
+});
+
+export const answerSubmissionResponseSchema = answerSubmissionSchema.extend({
+  status: z.literal("received"),
+  message: z.string(),
+});
+
 export const evaluationResultSchema = z.object({
   is_correct: z.boolean(),
   score: z.number().min(0).max(1),
@@ -162,6 +173,10 @@ export const answerEvaluationResponseSchema = z.object({
   next_action: nextActionSchema,
 });
 
+export const answerEvaluationOnlyResponseSchema = z.object({
+  evaluation: evaluationResultSchema,
+});
+
 export type CurrentLevel = z.infer<typeof currentLevelSchema>;
 export type LearningPreference = z.infer<typeof learningPreferenceSchema>;
 export type SourceMode = z.infer<typeof sourceModeSchema>;
@@ -182,7 +197,10 @@ export type Assessment = z.infer<typeof assessmentSchema>;
 export type PracticalTask = z.infer<typeof practicalTaskSchema>;
 export type LessonArtifact = z.infer<typeof lessonArtifactSchema>;
 export type LessonStartResponse = z.infer<typeof lessonStartResponseSchema>;
+export type AnswerSubmission = z.infer<typeof answerSubmissionSchema>;
+export type AnswerSubmissionResponse = z.infer<typeof answerSubmissionResponseSchema>;
 export type EvaluationResult = z.infer<typeof evaluationResultSchema>;
+export type AnswerEvaluationOnlyResponse = z.infer<typeof answerEvaluationOnlyResponseSchema>;
 export type MasteryState = z.infer<typeof masteryStateSchema>;
 export type MasteryUpdate = z.infer<typeof masteryUpdateSchema>;
 export type NextAction = z.infer<typeof nextActionSchema>;

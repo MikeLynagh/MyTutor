@@ -1,0 +1,37 @@
+from fastapi import APIRouter, HTTPException
+
+from app.agents.evaluator import EvaluatorAgent
+from app.models.memory_store import memory_store
+from app.schemas.answer import AnswerEvaluationOnlyResponse, AnswerSubmission
+
+router = APIRouter()
+evaluator = EvaluatorAgent()
+
+
+@router.post("/missions/{mission_id}/answers", response_model=AnswerEvaluationOnlyResponse)
+def submit_answer(mission_id: str, payload: AnswerSubmission):
+    mission = memory_store.get_mission(mission_id)
+    if mission is None:
+        raise HTTPException(status_code=404, detail="Mission not found")
+
+    lesson = memory_store.get_lesson(mission_id, payload.objective_id)
+    if lesson is None or lesson.lesson_id != payload.lesson_id:
+        raise HTTPException(status_code=404, detail="Lesson not found for this mission and objective")
+
+    mission_plan = memory_store.get_mission_plan(mission_id)
+    if mission_plan is None:
+        raise HTTPException(status_code=404, detail="Mission plan not found")
+
+    objective = next(
+        (candidate for candidate in mission_plan.objectives if candidate.id == payload.objective_id),
+        None,
+    )
+    if objective is None:
+        raise HTTPException(status_code=404, detail="Objective not found in mission plan")
+
+    evaluation = evaluator.evaluate_answer(
+        objective=objective,
+        assessment=lesson.assessment,
+        learner_answer=payload.answer,
+    )
+    return AnswerEvaluationOnlyResponse(evaluation=evaluation)

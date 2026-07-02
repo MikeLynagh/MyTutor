@@ -164,6 +164,55 @@ class MockLLMProvider:
 
             return schema.model_validate(payload)
 
+        if schema_name == "EvaluationResult":
+            learner_answer = str(prompt_data.get("learner_answer", "")).lower()
+            rubric = prompt_data.get("rubric", [])
+            expected_answer = str(prompt_data.get("expected_answer", "")).lower()
+            normalized_context = f"{expected_answer} {' '.join(rubric)}".lower()
+
+            required_terms = []
+            if "centre" in normalized_context or "center" in normalized_context:
+                required_terms.append(("centre", ["centre", "center", "one colour", "one color"]))
+            if "edge" in normalized_context:
+                required_terms.append(("edge", ["edge", "two colours", "two colors"]))
+            if "corner" in normalized_context:
+                required_terms.append(("corner", ["corner", "three colours", "three colors"]))
+
+            if required_terms:
+                matched_terms = [
+                    label
+                    for label, aliases in required_terms
+                    if any(alias in learner_answer for alias in aliases)
+                ]
+                score = len(matched_terms) / len(required_terms)
+                missing_points = [
+                    f"Mentions {label} pieces accurately"
+                    for label, _aliases in required_terms
+                    if label not in matched_terms
+                ]
+            else:
+                answer_tokens = {token for token in re.findall(r"[a-zA-Z]{4,}", learner_answer)}
+                expected_tokens = {token for token in re.findall(r"[a-zA-Z]{4,}", expected_answer)}
+                overlap = answer_tokens & expected_tokens
+                score = min(1.0, len(overlap) / max(1, len(expected_tokens) * 0.5))
+                missing_points = list(rubric)[:3] if score < 0.7 else []
+
+            is_correct = score >= 0.75
+            return schema.model_validate(
+                {
+                    "is_correct": is_correct,
+                    "score": round(score, 2),
+                    "feedback": (
+                        "Good answer. It matches the assessment criteria."
+                        if is_correct
+                        else "Your answer is on the right track, but it misses part of the assessment criteria."
+                    ),
+                    "misconception": None if is_correct else "Some required assessment points are missing or unclear.",
+                    "missing_points": missing_points,
+                    "next_hint": None if is_correct else (missing_points[0] if missing_points else "Review the key points and try again."),
+                }
+            )
+
         goal = prompt_data.get("mission_goal", "this topic")
         search_results = prompt_data.get("search_results", [])
 
