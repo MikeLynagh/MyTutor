@@ -7,8 +7,8 @@ import { ChevronLeft, ChevronRight, Loader2, RefreshCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import type { LessonStartResponse, Mission } from "@/types/mission";
-import { lessonStartResponseSchema, missionSchema } from "@/types/mission";
+import type { AnswerEvaluationOnlyResponse, LessonStartResponse, Mission } from "@/types/mission";
+import { answerEvaluationOnlyResponseSchema, lessonStartResponseSchema, missionSchema } from "@/types/mission";
 
 function lessonStorageKey(missionId: string) {
   return `mission:${missionId}:lesson`;
@@ -24,8 +24,10 @@ export default function MissionLessonPage() {
   const [lessonResponse, setLessonResponse] = React.useState<LessonStartResponse | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isRegenerating, setIsRegenerating] = React.useState(false);
+  const [isSubmittingAnswer, setIsSubmittingAnswer] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [answer, setAnswer] = React.useState("");
+  const [answerEvaluation, setAnswerEvaluation] = React.useState<AnswerEvaluationOnlyResponse | null>(null);
 
   React.useEffect(() => {
     const apiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
@@ -110,6 +112,7 @@ export default function MissionLessonPage() {
       const lessonData = lessonStartResponseSchema.parse(await response.json());
       setLessonResponse(lessonData);
       setAnswer("");
+      setAnswerEvaluation(null);
       window.sessionStorage.setItem(lessonStorageKey(missionId), JSON.stringify(lessonData));
       setError(null);
     } catch (regenerateError) {
@@ -117,6 +120,46 @@ export default function MissionLessonPage() {
       setError("Could not regenerate the lesson.");
     } finally {
       setIsRegenerating(false);
+    }
+  }
+
+  async function submitAnswer(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!lessonResponse || !answer.trim()) {
+      return;
+    }
+
+    const apiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
+    const missionId = params.missionId;
+
+    setIsSubmittingAnswer(true);
+    setAnswerEvaluation(null);
+    try {
+      const response = await fetch(`${apiUrl}/api/missions/${missionId}/answers`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          lesson_id: lessonResponse.lesson.lesson_id,
+          objective_id: lessonResponse.lesson.objective_id,
+          answer,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to submit answer: ${response.status}`);
+      }
+
+      const evaluation = answerEvaluationOnlyResponseSchema.parse(await response.json());
+      setAnswerEvaluation(evaluation);
+      setError(null);
+    } catch (submitError) {
+      console.error("failed to submit answer", submitError);
+      setError("Could not submit your answer.");
+    } finally {
+      setIsSubmittingAnswer(false);
     }
   }
 
@@ -205,20 +248,11 @@ export default function MissionLessonPage() {
         <p className="text-sm leading-relaxed text-slate-600">
           {lessonResponse.lesson.assessment.question}
         </p>
-        {lessonResponse.lesson.assessment.rubric.length > 0 ? (
-          <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-slate-600">
-            {lessonResponse.lesson.assessment.rubric.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ol>
-        ) : null}
       </section>
 
       <form
         className="mt-6"
-        onSubmit={(event) => {
-          event.preventDefault();
-        }}
+        onSubmit={submitAnswer}
       >
         <Textarea
           className="min-h-28 resize-none rounded-lg border-slate-200 text-sm text-slate-700 placeholder:text-slate-400 focus-visible:ring-indigo-400"
@@ -227,11 +261,51 @@ export default function MissionLessonPage() {
           placeholder="Write your answer here"
         />
         <div className="mt-3 flex justify-end">
-          <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700" disabled={!answer.trim()}>
-            Submit Answer
+          <Button
+            type="submit"
+            className="bg-indigo-600 hover:bg-indigo-700"
+            disabled={!answer.trim() || isSubmittingAnswer}
+          >
+            {isSubmittingAnswer ? "Submitting..." : "Submit Answer"}
           </Button>
         </div>
       </form>
+
+      {answerEvaluation ? (
+        <section className="mt-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-slate-900">Feedback</h2>
+            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-600">
+              Score {Math.round(answerEvaluation.evaluation.score * 100)}%
+            </span>
+          </div>
+          <p className="mt-3 text-sm leading-relaxed text-slate-700">
+            {answerEvaluation.evaluation.feedback}
+          </p>
+          {answerEvaluation.evaluation.misconception ? (
+            <p className="mt-3 text-sm leading-relaxed text-slate-600">
+              <span className="font-medium text-slate-800">Possible misconception:</span>{" "}
+              {answerEvaluation.evaluation.misconception}
+            </p>
+          ) : null}
+          {answerEvaluation.evaluation.missing_points.length > 0 ? (
+            <div className="mt-3">
+              <p className="text-sm font-medium text-slate-800">Missing points</p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
+                {answerEvaluation.evaluation.missing_points.map((point) => (
+                  <li key={point}>{point}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {answerEvaluation.evaluation.next_hint ? (
+            <p className="mt-3 text-sm leading-relaxed text-slate-600">
+              <span className="font-medium text-slate-800">Hint:</span>{" "}
+              {answerEvaluation.evaluation.next_hint}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       <div className="mt-8 flex items-center justify-between border-t border-slate-200/60 pt-4">
         <Button variant="outline" size="sm" className="gap-1 border-slate-200 text-slate-600 hover:bg-slate-50" disabled>
