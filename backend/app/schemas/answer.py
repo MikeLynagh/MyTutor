@@ -34,5 +34,6 @@ class AnswerEvaluationResponse(BaseModel):
     next_action: NextAction
 
 
-class AnswerEvaluationOnlyResponse(BaseModel):
+class AnswerEvaluationWithMasteryResponse(BaseModel):
     evaluation: EvaluationResult
+    mastery: MasteryUpdate

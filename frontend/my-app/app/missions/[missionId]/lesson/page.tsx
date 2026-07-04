@@ -7,8 +7,8 @@ import { ChevronLeft, ChevronRight, Loader2, RefreshCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import type { AnswerEvaluationOnlyResponse, LessonStartResponse, Mission } from "@/types/mission";
-import { answerEvaluationOnlyResponseSchema, lessonStartResponseSchema, missionSchema } from "@/types/mission";
+import type { answerEvaluationWithMasteryResponse, LessonStartResponse, Mission } from "@/types/mission";
+import { answerEvaluationWithMasteryResponseSchema, lessonStartResponseSchema, missionSchema } from "@/types/mission";
 
 function lessonStorageKey(missionId: string) {
   return `mission:${missionId}:lesson`;
@@ -27,7 +27,7 @@ export default function MissionLessonPage() {
   const [isSubmittingAnswer, setIsSubmittingAnswer] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [answer, setAnswer] = React.useState("");
-  const [answerEvaluation, setAnswerEvaluation] = React.useState<AnswerEvaluationOnlyResponse | null>(null);
+  const [answerEvaluation, setAnswerEvaluation] = React.useState<answerEvaluationWithMasteryResponse | null>(null);
 
   React.useEffect(() => {
     const apiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
@@ -152,7 +152,7 @@ export default function MissionLessonPage() {
         throw new Error(`Failed to submit answer: ${response.status}`);
       }
 
-      const evaluation = answerEvaluationOnlyResponseSchema.parse(await response.json());
+      const evaluation = answerEvaluationWithMasteryResponseSchema.parse(await response.json());
       setAnswerEvaluation(evaluation);
       setError(null);
     } catch (submitError) {
@@ -304,6 +304,12 @@ export default function MissionLessonPage() {
               {answerEvaluation.evaluation.next_hint}
             </p>
           ) : null}
+          <p className="mt-3 text-sm leading-relaxed text-slate-800">
+            <span className="font-medium text-slate-800">Mastery:</span>{' '}
+            {Math.round(answerEvaluation.mastery.mastery_before * 100)}% → {Math.round(
+              answerEvaluation.mastery.mastery_after * 100,
+            )}%
+          </p>
         </section>
       ) : null}
 
