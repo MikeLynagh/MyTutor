@@ -173,8 +173,9 @@ export const answerEvaluationResponseSchema = z.object({
   next_action: nextActionSchema,
 });
 
-export const answerEvaluationOnlyResponseSchema = z.object({
+export const answerEvaluationWithMasteryResponseSchema = z.object({
   evaluation: evaluationResultSchema,
+  mastery: masteryUpdateSchema,
 });
 
 export type CurrentLevel = z.infer<typeof currentLevelSchema>;
@@ -200,8 +201,8 @@ export type LessonStartResponse = z.infer<typeof lessonStartResponseSchema>;
 export type AnswerSubmission = z.infer<typeof answerSubmissionSchema>;
 export type AnswerSubmissionResponse = z.infer<typeof answerSubmissionResponseSchema>;
 export type EvaluationResult = z.infer<typeof evaluationResultSchema>;
-export type AnswerEvaluationOnlyResponse = z.infer<typeof answerEvaluationOnlyResponseSchema>;
 export type MasteryState = z.infer<typeof masteryStateSchema>;
 export type MasteryUpdate = z.infer<typeof masteryUpdateSchema>;
 export type NextAction = z.infer<typeof nextActionSchema>;
 export type AnswerEvaluationResponse = z.infer<typeof answerEvaluationResponseSchema>;
+export type answerEvaluationWithMasteryResponse = z.infer<typeof answerEvaluationWithMasteryResponseSchema>;
