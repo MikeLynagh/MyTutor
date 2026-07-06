@@ -4,10 +4,12 @@ from app.agents.evaluator import EvaluatorAgent
 from app.models.memory_store import memory_store
 from app.schemas.answer import AnswerEvaluationWithMasteryResponse, AnswerSubmission
 from app.services.mastery_tracker import MasteryTracker
+from app.services.task_router import TaskRouter
 
 router = APIRouter()
 evaluator = EvaluatorAgent()
 mastery_tracker = MasteryTracker()
+task_router = TaskRouter()
 
 
 @router.post("/missions/{mission_id}/answers", response_model=AnswerEvaluationWithMasteryResponse)
@@ -41,6 +43,7 @@ def submit_answer(mission_id: str, payload: AnswerSubmission):
         mission_id=mission_id,
         objective_id=payload.objective_id,
     )
+
     mastery = mastery_tracker.update(
         objective_id=payload.objective_id,
         current_mastery=objective_state.p_mastery,
@@ -58,13 +61,29 @@ def submit_answer(mission_id: str, payload: AnswerSubmission):
         ]
         if error
     ][-5:]
-
     memory_store.save_objective_mastery(
         mission_id=mission_id,
         objective_state=objective_state,
     )
 
+    next_task = task_router.route(
+        objective_id=objective.id,
+        objective_title=objective.title,
+        success_criteria=objective.success_criteria,
+        assessment_type=objective.assessment_type,
+        mission_type=mission_plan.mission_type,
+        score=evaluation.score,
+        mastery_after=mastery.mastery_after,
+        misconception=evaluation.misconception,
+    )
+
+    memory_store.save_latest_next_task(
+        mission_id=mission_id,
+        next_task=next_task,
+    )
+    
     return AnswerEvaluationWithMasteryResponse(
         evaluation=evaluation,
         mastery=mastery,
+        next_task=next_task,
     )

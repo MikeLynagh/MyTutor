@@ -36,6 +36,26 @@ export const nextActionTypeSchema = z.enum([
   "advance",
 ]);
 
+export const nextLearningTaskTypeSchema = z.enum([
+  "lesson",
+  "remediation",
+  "new_example",
+  "practice",
+  "practical_check",
+  "retrieval_check",
+  "challenge",
+  "review",
+  "advance",
+]);
+
+export const responseTypeSchema = z.enum([
+  "short_written_answer",
+  "practical_confirmation",
+  "code_submission",
+  "self_check",
+  "none",
+]);
+
 export const missionCreateSchema = z.object({
   goal: z.string(),
   why: z.string(),
@@ -128,6 +148,13 @@ export const lessonStartResponseSchema = z.object({
   lesson: lessonArtifactSchema,
 });
 
+export const nextTaskResponseSchema = z.object({
+  mission_id: z.string(),
+  objective_id: z.string(),
+  task_type: nextLearningTaskTypeSchema,
+  lesson: lessonArtifactSchema,
+});
+
 export const answerSubmissionSchema = z.object({
   lesson_id: z.string(),
   objective_id: z.string(),
@@ -167,6 +194,16 @@ export const nextActionSchema = z.object({
   reason: z.string(),
 });
 
+export const nextLearningTaskSchema = z.object({
+  type: nextLearningTaskTypeSchema,
+  title: z.string(),
+  reason: z.string(),
+  instruction: z.string(),
+  success_criteria: z.string(),
+  response_type: responseTypeSchema,
+  target_objective_id: z.string(),
+});
+
 export const answerEvaluationResponseSchema = z.object({
   evaluation: evaluationResultSchema,
   mastery: masteryUpdateSchema,
@@ -176,6 +213,7 @@ export const answerEvaluationResponseSchema = z.object({
 export const answerEvaluationWithMasteryResponseSchema = z.object({
   evaluation: evaluationResultSchema,
   mastery: masteryUpdateSchema,
+  next_task: nextLearningTaskSchema,
 });
 
 export type CurrentLevel = z.infer<typeof currentLevelSchema>;
@@ -185,6 +223,7 @@ export type MissionType = z.infer<typeof missionTypeSchema>;
 export type ResourceType = z.infer<typeof resourceTypeSchema>;
 export type AssessmentType = z.infer<typeof assessmentTypeSchema>;
 export type NextActionType = z.infer<typeof nextActionTypeSchema>;
+export type NextLearningTask = z.infer<typeof nextLearningTaskSchema>;
 export type MissionCreate = z.infer<typeof missionCreateSchema>;
 export type Mission = z.infer<typeof missionSchema>;
 export type MissionPlanRequest = z.infer<typeof missionPlanRequestSchema>;
@@ -198,6 +237,7 @@ export type Assessment = z.infer<typeof assessmentSchema>;
 export type PracticalTask = z.infer<typeof practicalTaskSchema>;
 export type LessonArtifact = z.infer<typeof lessonArtifactSchema>;
 export type LessonStartResponse = z.infer<typeof lessonStartResponseSchema>;
+export type NextTaskResponse = z.infer<typeof nextTaskResponseSchema>;
 export type AnswerSubmission = z.infer<typeof answerSubmissionSchema>;
 export type AnswerSubmissionResponse = z.infer<typeof answerSubmissionResponseSchema>;
 export type EvaluationResult = z.infer<typeof evaluationResultSchema>;
@@ -205,4 +245,5 @@ export type MasteryState = z.infer<typeof masteryStateSchema>;
 export type MasteryUpdate = z.infer<typeof masteryUpdateSchema>;
 export type NextAction = z.infer<typeof nextActionSchema>;
 export type AnswerEvaluationResponse = z.infer<typeof answerEvaluationResponseSchema>;
-export type answerEvaluationWithMasteryResponse = z.infer<typeof answerEvaluationWithMasteryResponseSchema>;
+export type AnswerEvaluationWithMasteryResponse = z.infer<typeof answerEvaluationWithMasteryResponseSchema>;
+export type answerEvaluationWithMasteryResponse = AnswerEvaluationWithMasteryResponse;
