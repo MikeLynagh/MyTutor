@@ -8,7 +8,12 @@ import { ChevronLeft, ChevronRight, Loader2, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { answerEvaluationWithMasteryResponse, LessonStartResponse, Mission } from "@/types/mission";
-import { answerEvaluationWithMasteryResponseSchema, lessonStartResponseSchema, missionSchema } from "@/types/mission";
+import {
+  answerEvaluationWithMasteryResponseSchema,
+  lessonStartResponseSchema,
+  missionSchema,
+  nextTaskResponseSchema,
+} from "@/types/mission";
 
 function lessonStorageKey(missionId: string) {
   return `mission:${missionId}:lesson`;
@@ -25,6 +30,7 @@ export default function MissionLessonPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [isRegenerating, setIsRegenerating] = React.useState(false);
   const [isSubmittingAnswer, setIsSubmittingAnswer] = React.useState(false);
+  const [isContinuing, setIsContinuing] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [answer, setAnswer] = React.useState("");
   const [answerEvaluation, setAnswerEvaluation] = React.useState<answerEvaluationWithMasteryResponse | null>(null);
@@ -160,6 +166,43 @@ export default function MissionLessonPage() {
       setError("Could not submit your answer.");
     } finally {
       setIsSubmittingAnswer(false);
+    }
+  }
+
+  async function continueToNextTask() {
+    const apiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
+    const missionId = params.missionId;
+
+    setIsContinuing(true);
+    try {
+      const response = await fetch(`${apiUrl}/api/missions/${missionId}/tasks/next`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to load next task: ${response.status}`);
+      }
+
+      const nextTaskResponse = nextTaskResponseSchema.parse(await response.json());
+      const lessonData: LessonStartResponse = {
+        mission_id: nextTaskResponse.mission_id,
+        objective_id: nextTaskResponse.objective_id,
+        lesson: nextTaskResponse.lesson,
+      };
+
+      setLessonResponse(lessonData);
+      setAnswer("");
+      setAnswerEvaluation(null);
+      window.sessionStorage.setItem(lessonStorageKey(missionId), JSON.stringify(lessonData));
+      setError(null);
+    } catch (continueError) {
+      console.error("failed to continue to next task", continueError);
+      setError("Could not load the next task.");
+    } finally {
+      setIsContinuing(false);
     }
   }
 
@@ -310,6 +353,49 @@ export default function MissionLessonPage() {
               answerEvaluation.mastery.mastery_after * 100,
             )}%
           </p>
+          <div className="mt-4 border-t border-slate-200 pt-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-indigo-600">Next task</p>
+                <h3 className="mt-1 text-base font-semibold text-slate-900">
+                  {answerEvaluation.next_task.title}
+                </h3>
+              </div>
+              <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-500">
+                {answerEvaluation.next_task.type.replaceAll("_", " ")}
+              </span>
+            </div>
+            <p className="mt-3 text-sm leading-relaxed text-slate-700">
+              {answerEvaluation.next_task.reason}
+            </p>
+            <p className="mt-3 text-sm leading-relaxed text-slate-600">
+              {answerEvaluation.next_task.instruction}
+            </p>
+            <p className="mt-3 text-sm leading-relaxed text-slate-600">
+              <span className="font-medium text-slate-800">Success criteria:</span>{" "}
+              {answerEvaluation.next_task.success_criteria}
+            </p>
+            <div className="mt-4 flex justify-end">
+              <Button
+                type="button"
+                className="gap-1 bg-indigo-600 hover:bg-indigo-700"
+                onClick={continueToNextTask}
+                disabled={isContinuing}
+              >
+                {isContinuing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading next task
+                  </>
+                ) : (
+                  <>
+                    Continue
+                    <ChevronRight className="h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
         </section>
       ) : null}
 
@@ -319,11 +405,8 @@ export default function MissionLessonPage() {
           Previous Lesson
         </Button>
         <span className="text-xs text-slate-400">Lesson 1</span>
-        <Button asChild size="sm" className="gap-1 bg-indigo-600 hover:bg-indigo-700">
-          <Link href={`/missions/${params.missionId}/progress`}>
-            Ready for next lesson
-            <ChevronRight className="h-4 w-4" />
-          </Link>
+        <Button asChild variant="outline" size="sm" className="gap-1 border-slate-200 text-slate-600 hover:bg-slate-50">
+          <Link href={`/missions/${params.missionId}/progress`}>Progress</Link>
         </Button>
       </div>
     </div>

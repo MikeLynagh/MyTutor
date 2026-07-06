@@ -3,7 +3,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.evaluation import EvaluationResult
-from app.schemas.mastery import MasteryUpdate, NextAction
+from app.schemas.mastery import MasteryUpdate, NextAction, NextLearningTask
 
 
 class AnswerSubmission(BaseModel):
@@ -37,3 +37,4 @@ class AnswerEvaluationResponse(BaseModel):
 class AnswerEvaluationWithMasteryResponse(BaseModel):
     evaluation: EvaluationResult
     mastery: MasteryUpdate
+    next_task: NextLearningTask

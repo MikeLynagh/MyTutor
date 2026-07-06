@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 
+from app.schemas.mastery import NextLearningTaskType
 from app.schemas.plan import AssessmentType
 
 
@@ -29,4 +30,11 @@ class LessonArtifact(BaseModel):
 class LessonStartResponse(BaseModel):
     mission_id: str
     objective_id: str
+    lesson: LessonArtifact
+
+
+class NextTaskResponse(BaseModel):
+    mission_id: str
+    objective_id: str
+    task_type: NextLearningTaskType
     lesson: LessonArtifact

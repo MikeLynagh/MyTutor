@@ -1,5 +1,8 @@
 from pydantic import BaseModel, Field
 
+from app.schemas.mastery import NextLearningTask
+
+
 class ObjectiveMasteryState(BaseModel):
     objective_id: str
     # probability from 0 to 1, likeliness to know objective
@@ -12,3 +15,4 @@ class ObjectiveMasteryState(BaseModel):
 class MissionLearnerState(BaseModel):
     mission_id: str
     objectives: dict[str, ObjectiveMasteryState] = Field(default_factory=dict)
+    latest_next_task: NextLearningTask | None = None

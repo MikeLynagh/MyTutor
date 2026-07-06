@@ -1,6 +1,7 @@
 from app.models.learner import MissionLearnerState, ObjectiveMasteryState
-from app.schemas.mission import Mission
 from app.schemas.lesson import LessonArtifact
+from app.schemas.mastery import NextLearningTask
+from app.schemas.mission import Mission
 from app.schemas.mission_plan import MissionPlanResponse
 
 
@@ -55,6 +56,19 @@ class MemoryStore:
         learner_state = self.get_learner_state(mission_id)
         learner_state.objectives[objective_state.objective_id] = objective_state
         return objective_state
+
+    def save_latest_next_task(
+        self,
+        mission_id: str,
+        next_task: NextLearningTask,
+    ) -> NextLearningTask:
+        learner_state = self.get_learner_state(mission_id)
+        learner_state.latest_next_task = next_task
+        return next_task
+
+    def get_latest_next_task(self, mission_id: str) -> NextLearningTask | None:
+        learner_state = self.get_learner_state(mission_id)
+        return learner_state.latest_next_task
 
 
 memory_store = MemoryStore()
