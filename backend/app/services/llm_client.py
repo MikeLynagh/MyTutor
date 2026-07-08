@@ -213,6 +213,20 @@ class MockLLMProvider:
                 }
             )
 
+        if schema_name == "MissionChatLLMResponse":
+            message = str(prompt_data.get("message", "")).strip()
+            mission_goal = str(prompt_data.get("mission", {}).get("goal", "this mission"))
+            lesson = prompt_data.get("current_lesson") or {}
+            lesson_title = lesson.get("title") or "the current lesson"
+            return schema.model_validate(
+                {
+                    "content": (
+                        f"For your mission to {mission_goal}, focus on {lesson_title}. "
+                        f"Your question was: {message}. Use the current lesson steps and success criteria to check your understanding."
+                    )
+                }
+            )
+
         goal = prompt_data.get("mission_goal", "this topic")
         search_results = prompt_data.get("search_results", [])
 

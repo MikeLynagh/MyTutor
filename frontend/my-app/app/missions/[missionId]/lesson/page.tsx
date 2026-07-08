@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, Loader2, RefreshCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import type { answerEvaluationWithMasteryResponse, LessonStartResponse, Mission } from "@/types/mission";
 import {
@@ -23,6 +24,30 @@ function missionStorageKey(missionId: string) {
   return `mission:${missionId}`;
 }
 
+function formatAssessmentType(type: string) {
+  return type.replaceAll("_", " ");
+}
+
+function checklistItemsFromSuccessCriteria(successCriteria: string) {
+  const items = successCriteria
+    .split(/[.;]\s+/)
+    .map((item) => item.trim().replace(/[.;]$/, ""))
+    .filter(Boolean)
+    .slice(0, 8);
+
+  return items.length > 0 ? items : ["I completed the practical task."];
+}
+
+function fieldId(prefix: string, value: string, index: number) {
+  const slug = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 40);
+
+  return `${prefix}-${index}-${slug || "item"}`;
+}
+
 export default function MissionLessonPage() {
   const params = useParams<{ missionId: string }>();
   const [mission, setMission] = React.useState<Mission | null>(null);
@@ -33,7 +58,48 @@ export default function MissionLessonPage() {
   const [isContinuing, setIsContinuing] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [answer, setAnswer] = React.useState("");
+  const [selectedOption, setSelectedOption] = React.useState("");
+  const [completedChecks, setCompletedChecks] = React.useState<string[]>([]);
+  const [practicalReflection, setPracticalReflection] = React.useState("");
   const [answerEvaluation, setAnswerEvaluation] = React.useState<answerEvaluationWithMasteryResponse | null>(null);
+
+  const assessment = lessonResponse?.lesson.assessment;
+  const practicalChecklistItems = React.useMemo(
+    () =>
+      checklistItemsFromSuccessCriteria(
+        lessonResponse?.lesson.practical_task?.success_criteria ||
+          lessonResponse?.lesson.assessment.expected_answer ||
+          "",
+      ),
+    [lessonResponse?.lesson.practical_task?.success_criteria, lessonResponse?.lesson.assessment.expected_answer],
+  );
+  const canSubmitAnswer = React.useMemo(() => {
+    if (!assessment) {
+      return false;
+    }
+
+    if (assessment.type === "multiple_choice") {
+      if (assessment.options.length === 0) {
+        return answer.trim().length > 0;
+      }
+
+      return selectedOption.trim().length > 0;
+    }
+
+    if (assessment.type === "practical_check") {
+      return practicalChecklistItems.every((item) => completedChecks.includes(item));
+    }
+
+    return answer.trim().length > 0;
+  }, [answer, assessment, completedChecks, practicalChecklistItems, selectedOption]);
+
+  React.useEffect(() => {
+    setAnswer("");
+    setSelectedOption("");
+    setCompletedChecks([]);
+    setPracticalReflection("");
+    setAnswerEvaluation(null);
+  }, [lessonResponse?.lesson.lesson_id]);
 
   React.useEffect(() => {
     const apiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
@@ -103,6 +169,7 @@ export default function MissionLessonPage() {
     const missionId = params.missionId;
 
     setIsRegenerating(true);
+    setError(null);
     try {
       const response = await fetch(`${apiUrl}/api/missions/${missionId}/lessons/start?force=true`, {
         method: "POST",
@@ -117,8 +184,6 @@ export default function MissionLessonPage() {
 
       const lessonData = lessonStartResponseSchema.parse(await response.json());
       setLessonResponse(lessonData);
-      setAnswer("");
-      setAnswerEvaluation(null);
       window.sessionStorage.setItem(lessonStorageKey(missionId), JSON.stringify(lessonData));
       setError(null);
     } catch (regenerateError) {
@@ -132,7 +197,7 @@ export default function MissionLessonPage() {
   async function submitAnswer(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!lessonResponse || !answer.trim()) {
+    if (!lessonResponse || !canSubmitAnswer) {
       return;
     }
 
@@ -141,7 +206,15 @@ export default function MissionLessonPage() {
 
     setIsSubmittingAnswer(true);
     setAnswerEvaluation(null);
+    setError(null);
     try {
+      const submittedAnswer = buildSubmittedAnswer({
+        assessmentType: lessonResponse.lesson.assessment.type,
+        writtenAnswer: answer,
+        selectedOption,
+        completedChecks,
+        practicalReflection,
+      });
       const response = await fetch(`${apiUrl}/api/missions/${missionId}/answers`, {
         method: "POST",
         headers: {
@@ -150,7 +223,7 @@ export default function MissionLessonPage() {
         body: JSON.stringify({
           lesson_id: lessonResponse.lesson.lesson_id,
           objective_id: lessonResponse.lesson.objective_id,
-          answer,
+          answer: submittedAnswer,
         }),
       });
 
@@ -174,6 +247,7 @@ export default function MissionLessonPage() {
     const missionId = params.missionId;
 
     setIsContinuing(true);
+    setError(null);
     try {
       const response = await fetch(`${apiUrl}/api/missions/${missionId}/tasks/next`, {
         method: "POST",
@@ -194,8 +268,6 @@ export default function MissionLessonPage() {
       };
 
       setLessonResponse(lessonData);
-      setAnswer("");
-      setAnswerEvaluation(null);
       window.sessionStorage.setItem(lessonStorageKey(missionId), JSON.stringify(lessonData));
       setError(null);
     } catch (continueError) {
@@ -209,9 +281,12 @@ export default function MissionLessonPage() {
   if (isLoading && !lessonResponse) {
     return (
       <div className="flex min-h-[360px] items-center justify-center">
-        <div className="flex items-center gap-2 text-sm text-slate-500">
-          <Loader2 className="size-4 animate-spin" />
-          Starting lesson
+        <div className="max-w-sm rounded-lg border border-slate-200 bg-slate-50 px-5 py-4 text-center">
+          <Loader2 className="mx-auto h-5 w-5 animate-spin text-indigo-600" />
+          <p className="mt-3 text-sm font-medium text-slate-800">Generating your lesson</p>
+          <p className="mt-1 text-sm leading-relaxed text-slate-500">
+            The tutor is turning your first objective into a guided lesson and assessment.
+          </p>
         </div>
       </div>
     );
@@ -235,6 +310,28 @@ export default function MissionLessonPage() {
 
   return (
     <div className="max-w-2xl">
+      {isRegenerating || isContinuing ? (
+        <div className="mb-5 rounded-lg border border-indigo-200 bg-indigo-50/70 px-4 py-3">
+          <div className="flex items-start gap-3">
+            <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-indigo-600" />
+            <div>
+              <p className="text-sm font-medium text-indigo-950">
+                {isContinuing ? "Preparing your next task" : "Regenerating this lesson"}
+              </p>
+              <p className="mt-1 text-sm leading-relaxed text-indigo-900/80">
+                {isContinuing
+                  ? "The tutor is using your latest answer and mastery estimate to decide what to show next."
+                  : "The tutor is creating a fresh version of this lesson from the current objective."}
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {error ? (
+        <div className="mb-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+          {error}
+        </div>
+      ) : null}
       <div className="mb-2 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-indigo-600">
           <span>Lesson 1</span>
@@ -245,7 +342,7 @@ export default function MissionLessonPage() {
           size="sm"
           className="h-8 gap-1 border-slate-200 text-xs text-slate-600 hover:bg-slate-50"
           onClick={regenerateLesson}
-          disabled={isRegenerating}
+          disabled={isRegenerating || isContinuing || isSubmittingAnswer}
         >
           <RefreshCcw className={isRegenerating ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
           Regenerate
@@ -288,6 +385,9 @@ export default function MissionLessonPage() {
 
       <section className="mt-8">
         <h2 className="mb-2 text-lg font-semibold text-slate-800">Assessment</h2>
+        <p className="mb-2 text-xs font-medium uppercase tracking-wider text-indigo-600">
+          {formatAssessmentType(lessonResponse.lesson.assessment.type)}
+        </p>
         <p className="text-sm leading-relaxed text-slate-600">
           {lessonResponse.lesson.assessment.question}
         </p>
@@ -297,19 +397,47 @@ export default function MissionLessonPage() {
         className="mt-6"
         onSubmit={submitAnswer}
       >
-        <Textarea
-          className="min-h-28 resize-none rounded-lg border-slate-200 text-sm text-slate-700 placeholder:text-slate-400 focus-visible:ring-indigo-400"
-          value={answer}
-          onChange={(event) => setAnswer(event.target.value)}
-          placeholder="Write your answer here"
-        />
+        {lessonResponse.lesson.assessment.type === "multiple_choice" ? (
+          <MultipleChoiceAnswer
+            options={lessonResponse.lesson.assessment.options}
+            selectedOption={selectedOption}
+            onChange={setSelectedOption}
+            fallbackAnswer={answer}
+            onFallbackAnswerChange={setAnswer}
+            disabled={isSubmittingAnswer || isContinuing || isRegenerating}
+          />
+        ) : lessonResponse.lesson.assessment.type === "practical_check" ? (
+          <PracticalCheckAnswer
+            checklistItems={practicalChecklistItems}
+            completedChecks={completedChecks}
+            onCompletedChecksChange={setCompletedChecks}
+            reflection={practicalReflection}
+            onReflectionChange={setPracticalReflection}
+            disabled={isSubmittingAnswer || isContinuing || isRegenerating}
+          />
+        ) : (
+          <Textarea
+            className="min-h-28 resize-none rounded-lg border-slate-200 text-sm text-slate-700 placeholder:text-slate-400 focus-visible:ring-indigo-400"
+            value={answer}
+            onChange={(event) => setAnswer(event.target.value)}
+            placeholder="Write your answer here"
+            disabled={isSubmittingAnswer || isContinuing || isRegenerating}
+          />
+        )}
         <div className="mt-3 flex justify-end">
           <Button
             type="submit"
             className="bg-indigo-600 hover:bg-indigo-700"
-            disabled={!answer.trim() || isSubmittingAnswer}
+            disabled={!canSubmitAnswer || isSubmittingAnswer || isContinuing || isRegenerating}
           >
-            {isSubmittingAnswer ? "Submitting..." : "Submit Answer"}
+            {isSubmittingAnswer ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Checking answer
+              </>
+            ) : (
+              "Submit Answer"
+            )}
           </Button>
         </div>
       </form>
@@ -411,4 +539,147 @@ export default function MissionLessonPage() {
       </div>
     </div>
   );
+}
+
+function MultipleChoiceAnswer({
+  options,
+  selectedOption,
+  onChange,
+  fallbackAnswer,
+  onFallbackAnswerChange,
+  disabled,
+}: {
+  options: string[];
+  selectedOption: string;
+  onChange: (value: string) => void;
+  fallbackAnswer: string;
+  onFallbackAnswerChange: (value: string) => void;
+  disabled: boolean;
+}) {
+  if (options.length === 0) {
+    return (
+      <div className="space-y-3">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          This question is marked as multiple choice, but no answer options were generated. Answer in your own words.
+        </div>
+        <Textarea
+          className="min-h-24 resize-none rounded-lg border-slate-200 text-sm text-slate-700 placeholder:text-slate-400 focus-visible:ring-indigo-400"
+          value={fallbackAnswer}
+          onChange={(event) => onFallbackAnswerChange(event.target.value)}
+          placeholder="Write your answer here"
+          disabled={disabled}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <RadioGroup value={selectedOption} onValueChange={onChange} disabled={disabled} className="gap-2">
+      {options.map((option, index) => {
+        const id = fieldId("assessment-option", option, index);
+
+        return (
+          <label
+            key={option}
+            htmlFor={id}
+            className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 px-4 py-3 text-sm text-slate-700 transition-colors hover:bg-slate-50 has-[[data-state=checked]]:border-indigo-300 has-[[data-state=checked]]:bg-indigo-50/70"
+          >
+            <RadioGroupItem id={id} value={option} className="mt-0.5" />
+            <span>{option}</span>
+          </label>
+        );
+      })}
+    </RadioGroup>
+  );
+}
+
+function PracticalCheckAnswer({
+  checklistItems,
+  completedChecks,
+  onCompletedChecksChange,
+  reflection,
+  onReflectionChange,
+  disabled,
+}: {
+  checklistItems: string[];
+  completedChecks: string[];
+  onCompletedChecksChange: (value: string[]) => void;
+  reflection: string;
+  onReflectionChange: (value: string) => void;
+  disabled: boolean;
+}) {
+  function toggleCheck(item: string) {
+    if (completedChecks.includes(item)) {
+      onCompletedChecksChange(completedChecks.filter((check) => check !== item));
+      return;
+    }
+
+    onCompletedChecksChange([...completedChecks, item]);
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+        <p className="text-sm font-medium text-slate-800">Confirm what you completed</p>
+        <div className="mt-3 space-y-2">
+          {checklistItems.map((item, index) => {
+            const id = fieldId("practical-check", item, index);
+            const checked = completedChecks.includes(item);
+
+            return (
+              <label key={item} htmlFor={id} className="flex items-start gap-3 text-sm text-slate-700">
+                <input
+                  id={id}
+                  type="checkbox"
+                  checked={checked}
+                  disabled={disabled}
+                  onChange={() => toggleCheck(item)}
+                  className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                <span>{item}</span>
+              </label>
+            );
+          })}
+        </div>
+      </div>
+      <Textarea
+        className="min-h-24 resize-none rounded-lg border-slate-200 text-sm text-slate-700 placeholder:text-slate-400 focus-visible:ring-indigo-400"
+        value={reflection}
+        onChange={(event) => onReflectionChange(event.target.value)}
+        placeholder="Optional: add what you noticed while doing the practical task"
+        disabled={disabled}
+      />
+    </div>
+  );
+}
+
+function buildSubmittedAnswer({
+  assessmentType,
+  writtenAnswer,
+  selectedOption,
+  completedChecks,
+  practicalReflection,
+}: {
+  assessmentType: string;
+  writtenAnswer: string;
+  selectedOption: string;
+  completedChecks: string[];
+  practicalReflection: string;
+}) {
+  if (assessmentType === "multiple_choice") {
+    return selectedOption.trim()
+      ? `Selected option: ${selectedOption}`
+      : writtenAnswer.trim();
+  }
+
+  if (assessmentType === "practical_check") {
+    const completed = completedChecks.map((check) => `- ${check}`).join("\n");
+    const reflection = practicalReflection.trim()
+      ? `\nReflection: ${practicalReflection.trim()}`
+      : "";
+
+    return `Practical task completed.\nChecklist:\n${completed}${reflection}`;
+  }
+
+  return writtenAnswer.trim();
 }
