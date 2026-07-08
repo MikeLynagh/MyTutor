@@ -1,4 +1,5 @@
 from app.schemas.answer import AnswerEvaluationResponse, AnswerEvaluationWithMasteryResponse, AnswerSubmission
+from app.schemas.chat import ChatMessage, MissionChatRequest, MissionChatResponse
 from app.schemas.evaluation import EvaluationResult
 from app.schemas.lesson import Assessment, LessonArtifact, NextTaskResponse, PracticalTask
 from app.schemas.mastery import MasteryState, MasteryUpdate, NextAction, NextLearningTask
@@ -12,6 +13,7 @@ __all__ = [
     "AnswerEvaluationWithMasteryResponse",
     "AnswerSubmission",
     "Assessment",
+    "ChatMessage",
     "CuratedResource",
     "CuratedResourceBundle",
     "EvaluationResult",
@@ -23,6 +25,8 @@ __all__ = [
     "MissionCreate",
     "MissionPlanRequest",
     "MissionPlanResponse",
+    "MissionChatRequest",
+    "MissionChatResponse",
     "NextAction",
     "NextLearningTask",
     "NextTaskResponse",

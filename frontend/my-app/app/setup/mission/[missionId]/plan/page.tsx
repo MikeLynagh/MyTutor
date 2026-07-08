@@ -1,6 +1,7 @@
 "use client";
 import * as React from "react"
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2 } from "lucide-react";
 import { Controller, useForm } from "react-hook-form"
 import { Toaster, toast } from "sonner"
 import * as z from "zod"
@@ -61,6 +62,7 @@ export default function Page() {
     const router = useRouter();
     const [mission, setMission] = React.useState<Mission | null>(null);
     const [isLoadingMission, setIsLoadingMission] = React.useState(true);
+    const [isGeneratingPlan, setIsGeneratingPlan] = React.useState(false);
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: {
@@ -100,6 +102,7 @@ export default function Page() {
 
 
     async function onSubmit(data: z.infer<typeof formSchema>) {
+        setIsGeneratingPlan(true)
         try {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
             if (!mission) {
@@ -138,6 +141,7 @@ export default function Page() {
         }
         catch (error) {
             console.error('saved to fail form data', error)
+            setIsGeneratingPlan(false)
 
             toast("Something went wrong", {
                 description: "Could not save your preferences",
@@ -152,10 +156,23 @@ export default function Page() {
                 <CardHeader>
                     <CardTitle>Build your learning path</CardTitle>
                     <CardDescription>
-                        How should the tutor create your mission?
+                        Choose the context the tutor should use to build your mission.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
+                    {isGeneratingPlan ? (
+                        <div className="mb-5 rounded-lg border border-indigo-200 bg-indigo-50/70 px-4 py-3">
+                            <div className="flex items-start gap-3">
+                                <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-indigo-600" />
+                                <div>
+                                    <p className="text-sm font-medium text-indigo-950">Generating your mission plan</p>
+                                    <p className="mt-1 text-sm leading-relaxed text-indigo-900/80">
+                                        The tutor is reviewing your goal, checking resources, and building the first objective sequence.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    ) : null}
                     <form id="mission-plan-form" onSubmit={form.handleSubmit(onSubmit)}>
                         <FieldGroup>
                             <Controller
@@ -168,6 +185,7 @@ export default function Page() {
                                             onValueChange={field.onChange}
                                             value={field.value}
                                             className="flex flex-col gap-3"
+                                            disabled={isGeneratingPlan}
                                         >
                                             {sourceMode.map((preference) => {
                                                 const id = `learning-content-${preference.id}`
@@ -197,6 +215,7 @@ export default function Page() {
                                             placeholder=""
                                             autoComplete="off"
                                             className="min-h-32 resize-none"
+                                            disabled={isGeneratingPlan}
                                         />
                                         <FieldDescription>
                                             Paste notes, links, videos, documentation, or anything useful.
@@ -213,11 +232,18 @@ export default function Page() {
                     </form>
                 </CardContent>
                 <CardFooter className="justify-end gap-2">
-                    <Button type="button" variant="outline" onClick={() => form.reset()}>
+                    <Button type="button" variant="outline" onClick={() => form.reset()} disabled={isGeneratingPlan}>
                         Reset
                     </Button>
-                    <Button type="submit" form="mission-plan-form" disabled={isLoadingMission}>
-                        Generate Mission Plan
+                    <Button type="submit" form="mission-plan-form" disabled={isLoadingMission || isGeneratingPlan}>
+                        {isGeneratingPlan ? (
+                            <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Generating plan
+                            </>
+                        ) : (
+                            "Generate Mission Plan"
+                        )}
                     </Button>
                 </CardFooter>
             </Card>

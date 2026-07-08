@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
-from app.api import answers, lessons, mission_plan, missions
+from app.api import answers, chat, lessons, mission_plan, missions
 
 
 app = FastAPI(title="Adaptive AI Tutor API")
@@ -26,6 +26,7 @@ app.include_router(missions.router, prefix="/api")
 app.include_router(mission_plan.router, prefix="/api")
 app.include_router(lessons.router, prefix="/api")
 app.include_router(answers.router, prefix="/api")
+app.include_router(chat.router, prefix="/api")
 
 @app.get("/")
 def read_root():
