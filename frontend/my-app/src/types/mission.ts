@@ -216,6 +216,28 @@ export const answerEvaluationWithMasteryResponseSchema = z.object({
   next_task: nextLearningTaskSchema,
 });
 
+export const objectiveProgressStatusSchema = z.enum(["not_started", "in_progress", "mastered"]);
+
+export const objectiveProgressSchema = z.object({
+  objective_id: z.string(),
+  title: z.string(),
+  description: z.string(),
+  assessment_type: assessmentTypeSchema,
+  success_criteria: z.string(),
+  mastery: z.number().min(0).max(1),
+  attempts: z.number().int().min(0),
+  status: objectiveProgressStatusSchema,
+  recent_errors: z.array(z.string()),
+  last_feedback: z.string().nullable().optional(),
+});
+
+export const missionProgressResponseSchema = z.object({
+  mission_id: z.string(),
+  overall_mastery: z.number().min(0).max(1),
+  current_next_task: nextLearningTaskSchema.nullable(),
+  objectives: z.array(objectiveProgressSchema),
+});
+
 export type CurrentLevel = z.infer<typeof currentLevelSchema>;
 export type LearningPreference = z.infer<typeof learningPreferenceSchema>;
 export type SourceMode = z.infer<typeof sourceModeSchema>;
@@ -247,3 +269,6 @@ export type NextAction = z.infer<typeof nextActionSchema>;
 export type AnswerEvaluationResponse = z.infer<typeof answerEvaluationResponseSchema>;
 export type AnswerEvaluationWithMasteryResponse = z.infer<typeof answerEvaluationWithMasteryResponseSchema>;
 export type answerEvaluationWithMasteryResponse = AnswerEvaluationWithMasteryResponse;
+export type ObjectiveProgressStatus = z.infer<typeof objectiveProgressStatusSchema>;
+export type ObjectiveProgress = z.infer<typeof objectiveProgressSchema>;
+export type MissionProgressResponse = z.infer<typeof missionProgressResponseSchema>;
