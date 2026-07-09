@@ -3,7 +3,7 @@ import json
 from app.schemas.mission import CurrentLevel
 from app.schemas.resources import CuratedResourceBundle
 from app.services.llm_client import LLMClient, LLMClientError
-from app.services.web_search import SearchResult, WebSearchService
+from app.services.web_search import SearchResult, WebSearchError, WebSearchService
 
 
 class ResourceCuratorAgent: 
@@ -24,9 +24,14 @@ class ResourceCuratorAgent:
         selected_sources = []
         rejected_sources = []
         search_results: list[SearchResult] = []
+        search_error: str | None = None
 
         if source_mode in {"web", "both"}:
-            search_results = self.search_service.search(query=goal)
+            try:
+                search_results = self.search_service.search(query=goal)
+            except WebSearchError as exc:
+                search_error = str(exc)
+
             llm_bundle = self._curate_with_llm(
                 goal=goal,
                 source_mode=source_mode,
@@ -37,7 +42,12 @@ class ResourceCuratorAgent:
             )
 
             if llm_bundle is not None:
-                selected_sources.extend([resource.model_dump() for resource in llm_bundle.selected_sources])
+                selected_sources.extend(
+                    self._attach_highlights_to_selected_sources(
+                        selected_sources=[resource.model_dump() for resource in llm_bundle.selected_sources],
+                        search_results=search_results,
+                    )
+                )
                 rejected_sources.extend([resource.model_dump() for resource in llm_bundle.rejected_sources])
                 source_summary = llm_bundle.source_summary
                 recommended_learning_approach = llm_bundle.recommended_learning_approach
@@ -48,7 +58,12 @@ class ResourceCuratorAgent:
                 source_summary = (
                     "Beginner Rubik's cube resources should introduce notation first and then teach a layer-by-layer solving method."
                     if "rubik" in normalized_goal or "cube" in normalized_goal
-                    else self._build_general_summary(goal=goal, selected_count=len(selected_sources), search_results=search_results)
+                    else self._build_general_summary(
+                        goal=goal,
+                        selected_count=len(selected_sources),
+                        search_results=search_results,
+                        search_error=search_error,
+                    )
                 )
                 recommended_learning_approach = (
                     "beginner_layer_by_layer"
@@ -56,7 +71,12 @@ class ResourceCuratorAgent:
                     else "guided_foundations"
                 )
         else:
-            source_summary = self._build_general_summary(goal=goal, selected_count=0, search_results=search_results)
+            source_summary = self._build_general_summary(
+                goal=goal,
+                selected_count=0,
+                search_results=search_results,
+                search_error=None,
+            )
             recommended_learning_approach = "guided_foundations"
 
         user_material_already_selected = any(
@@ -70,6 +90,7 @@ class ResourceCuratorAgent:
                     "url": "user-material://provided",
                     "type": "user_material",
                     "reason": "Included because the learner provided their own notes or links.",
+                    "highlights": [user_material[:500]],
                 }
             )
 
@@ -178,12 +199,52 @@ class ResourceCuratorAgent:
                     "url": result["url"],
                     "type": resource_type,
                     "reason": reason,
+                    "highlights": self._highlights_from_search_result(result),
                 }
             )
 
         return selected_sources[:2], rejected_sources
 
-    def _build_general_summary(self, goal: str, selected_count: int, search_results: list[SearchResult]) -> str:
+    def _attach_highlights_to_selected_sources(
+        self,
+        *,
+        selected_sources: list[dict],
+        search_results: list[SearchResult],
+    ) -> list[dict]:
+        highlights_by_url = {
+            result["url"]: self._highlights_from_search_result(result)
+            for result in search_results
+        }
+
+        enriched_sources = []
+        for source in selected_sources:
+            source_highlights = source.get("highlights") or highlights_by_url.get(source.get("url", ""), [])
+            enriched_sources.append(
+                {
+                    **source,
+                    "highlights": source_highlights[:2],
+                }
+            )
+
+        return enriched_sources
+
+    def _highlights_from_search_result(self, result: SearchResult) -> list[str]:
+        snippet = result.get("snippet", "").strip()
+        if not snippet:
+            return []
+
+        return [snippet[:500]]
+
+    def _build_general_summary(
+        self,
+        goal: str,
+        selected_count: int,
+        search_results: list[SearchResult],
+        search_error: str | None,
+    ) -> str:
+        if search_error:
+            return f"Web search was unavailable, so the plan for {goal} was generated from the learner goal and any provided material."
+
         if not search_results:
             return f"No search results were found for {goal}, so the plan should fall back to user material or a static learning path."
 

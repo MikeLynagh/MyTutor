@@ -56,6 +56,7 @@ def start_lesson(mission_id: str, force: bool = False):
         learning_preference=mission.learning_preference,
         objective=objective,
         source_summary=source_summary,
+        selected_sources=mission_plan.selected_sources,
         recent_errors=[],
     )
     memory_store.save_lesson(mission_id, lesson)
@@ -100,6 +101,7 @@ def next_task(mission_id: str):
         learning_preference=mission.learning_preference,
         objective=objective,
         source_summary=mission_plan.source_summary,
+        selected_sources=mission_plan.selected_sources,
         recent_errors=objective_state.recent_errors,
     )
     memory_store.save_lesson(mission_id, lesson)

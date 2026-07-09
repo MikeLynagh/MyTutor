@@ -92,6 +92,7 @@ export const curatedResourceSchema = z.object({
   url: z.string(),
   type: resourceTypeSchema,
   reason: z.string(),
+  highlights: z.array(z.string()).default([]),
 });
 
 export const rejectedResourceSchema = z.object({
@@ -153,6 +154,21 @@ export const nextTaskResponseSchema = z.object({
   objective_id: z.string(),
   task_type: nextLearningTaskTypeSchema,
   lesson: lessonArtifactSchema,
+});
+
+export const chatMessageSchema = z.object({
+  role: z.enum(["user", "assistant"]),
+  content: z.string(),
+});
+
+export const missionChatRequestSchema = z.object({
+  message: z.string().trim().min(1),
+  current_objective_id: z.string().nullable().optional(),
+  history: z.array(chatMessageSchema),
+});
+
+export const missionChatResponseSchema = z.object({
+  message: chatMessageSchema,
 });
 
 export const answerSubmissionSchema = z.object({
@@ -260,6 +276,9 @@ export type PracticalTask = z.infer<typeof practicalTaskSchema>;
 export type LessonArtifact = z.infer<typeof lessonArtifactSchema>;
 export type LessonStartResponse = z.infer<typeof lessonStartResponseSchema>;
 export type NextTaskResponse = z.infer<typeof nextTaskResponseSchema>;
+export type ChatMessage = z.infer<typeof chatMessageSchema>;
+export type MissionChatRequest = z.infer<typeof missionChatRequestSchema>;
+export type MissionChatResponse = z.infer<typeof missionChatResponseSchema>;
 export type AnswerSubmission = z.infer<typeof answerSubmissionSchema>;
 export type AnswerSubmissionResponse = z.infer<typeof answerSubmissionResponseSchema>;
 export type EvaluationResult = z.infer<typeof evaluationResultSchema>;
