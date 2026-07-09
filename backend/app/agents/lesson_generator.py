@@ -5,6 +5,7 @@ from uuid import uuid4
 from app.schemas.lesson import Assessment, LessonArtifact, PracticalTask
 from app.schemas.mission import CurrentLevel, LearningPreference
 from app.schemas.plan import Objective
+from app.schemas.resources import CuratedResource
 from app.services.lesson_sanitizer import LessonSanitizer
 from app.services.llm_client import LLMClient, LLMClientError
 
@@ -24,6 +25,7 @@ class LessonGeneratorAgent:
         learning_preference: LearningPreference | None,
         objective: Objective,
         source_summary: str,
+        selected_sources: list[CuratedResource] | None = None,
         recent_errors: list[str] | None = None,
     ) -> LessonArtifact:
         lesson_id = str(uuid4())
@@ -33,6 +35,7 @@ class LessonGeneratorAgent:
             learning_preference=learning_preference,
             objective=objective,
             source_summary=source_summary,
+            selected_sources=selected_sources or [],
             recent_errors=recent_errors or [],
         )
 
@@ -60,6 +63,7 @@ class LessonGeneratorAgent:
         learning_preference: LearningPreference | None,
         objective: Objective,
         source_summary: str,
+        selected_sources: list[CuratedResource],
         recent_errors: list[str],
     ) -> LessonArtifact | None:
         system_prompt = (
@@ -68,6 +72,7 @@ class LessonGeneratorAgent:
             "Do not change the objective. "
             "Return valid json only and follow the schema exactly. "
             "Keep the lesson concise, stepwise, and aligned to the assessment. "
+            "Use source highlights as grounding when they are relevant, but do not copy long passages. "
             "Use safe semantic HTML to reduce cognitive load when useful. "
             "Visual structure should clarify comparisons, sequences, examples, checks, diagrams, tables, or callouts. "
             "Do not add decorative visuals."
@@ -79,6 +84,14 @@ class LessonGeneratorAgent:
                 "learning_preference": learning_preference or "step_by_step",
                 "objective": objective.model_dump(),
                 "source_summary": source_summary,
+                "source_evidence": [
+                    {
+                        "title": source.title,
+                        "url": source.url,
+                        "highlights": source.highlights[:2],
+                    }
+                    for source in selected_sources[:3]
+                ],
                 "recent_errors": recent_errors,
                 "requirements": {
                     "lesson_html_tags": [

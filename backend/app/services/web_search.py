@@ -2,11 +2,17 @@ import os
 from typing import Protocol, TypedDict
 from urllib.parse import urlparse
 
+import httpx
+
 
 class SearchResult(TypedDict):
     title: str
     url: str
     snippet: str
+
+
+class WebSearchError(Exception):
+    pass
 
 
 class SearchProvider(Protocol):
@@ -46,6 +52,66 @@ class MockSearchProvider:
         ]
 
 
+class ExaSearchProvider:
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        search_type: str | None = None,
+        num_results: int | None = None,
+        timeout_seconds: float | None = None,
+    ) -> None:
+        self.api_key = api_key
+        self.search_type = search_type or os.getenv("EXA_SEARCH_TYPE", "auto")
+        self.num_results = num_results or int(os.getenv("EXA_NUM_RESULTS", "8"))
+        self.timeout_seconds = timeout_seconds or float(os.getenv("EXA_TIMEOUT_SECONDS", "15"))
+
+    def search(self, query: str) -> list[SearchResult]:
+        try:
+            response = httpx.post(
+                "https://api.exa.ai/search",
+                headers={
+                    "Content-Type": "application/json",
+                    "x-api-key": self.api_key,
+                },
+                json={
+                    "query": query,
+                    "type": self.search_type,
+                    "numResults": self.num_results,
+                    "contents": {
+                        "highlights": True,
+                    },
+                },
+                timeout=self.timeout_seconds,
+            )
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            raise WebSearchError(
+                f"Exa search failed with status {exc.response.status_code}: {exc.response.text[:300]}"
+            ) from exc
+        except httpx.TimeoutException as exc:
+            raise WebSearchError(f"Exa search timed out after {self.timeout_seconds} seconds") from exc
+        except httpx.HTTPError as exc:
+            raise WebSearchError(f"Exa search failed: {exc}") from exc
+
+        payload = response.json()
+        return [self._result_to_search_result(result) for result in payload.get("results", [])]
+
+    def _result_to_search_result(self, result: dict) -> SearchResult:
+        highlights = result.get("highlights") or []
+        snippet = ""
+        if highlights:
+            snippet = " ".join(str(highlight).strip() for highlight in highlights if highlight).strip()
+        if not snippet:
+            snippet = str(result.get("summary") or result.get("text") or "").strip()
+
+        return {
+            "title": str(result.get("title") or "Untitled result"),
+            "url": str(result.get("url") or ""),
+            "snippet": snippet,
+        }
+
+
 class WebSearchService:
     def __init__(self, provider: SearchProvider | None = None, provider_name: str | None = None):
         self.provider = provider or self._build_provider(provider_name)
@@ -59,6 +125,12 @@ class WebSearchService:
 
         if selected_provider == "mock":
             return MockSearchProvider()
+
+        if selected_provider == "exa":
+            api_key = os.getenv("EXA_API_KEY")
+            if not api_key:
+                raise WebSearchError("EXA_API_KEY is required when WEB_SEARCH_PROVIDER=exa")
+            return ExaSearchProvider(api_key=api_key)
 
         raise ValueError(f"Unsupported web search provider: {selected_provider}")
 

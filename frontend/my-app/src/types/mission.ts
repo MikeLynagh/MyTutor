@@ -92,6 +92,7 @@ export const curatedResourceSchema = z.object({
   url: z.string(),
   type: resourceTypeSchema,
   reason: z.string(),
+  highlights: z.array(z.string()).default([]),
 });
 
 export const rejectedResourceSchema = z.object({
