@@ -6,6 +6,7 @@ from app.schemas.mastery import MasteryState, MasteryUpdate, NextAction, NextLea
 from app.schemas.mission import Mission, MissionCreate
 from app.schemas.mission_plan import MissionPlanRequest, MissionPlanResponse
 from app.schemas.plan import LearningPlan, Objective
+from app.schemas.progress import MissionProgressResponse, ObjectiveProgress
 from app.schemas.resources import CuratedResource, CuratedResourceBundle, RejectedResource
 
 __all__ = [
@@ -31,6 +32,7 @@ __all__ = [
     "NextLearningTask",
     "NextTaskResponse",
     "Objective",
+    "ObjectiveProgress",
     "PracticalTask",
     "RejectedResource",
 ]

@@ -26,7 +26,6 @@ app.include_router(missions.router, prefix="/api")
 app.include_router(mission_plan.router, prefix="/api")
 app.include_router(lessons.router, prefix="/api")
 app.include_router(answers.router, prefix="/api")
-app.include_router(chat.router, prefix="/api")
 
 @app.get("/")
 def read_root():
