@@ -290,8 +290,27 @@ function ResourceList({
               />
               <div className="min-w-0">
                 <p className="font-medium text-slate-800">{resource.title}</p>
-                <p className="mt-1 break-all text-xs text-slate-400">{resource.url}</p>
+                <a
+                  className="mt-1 block break-all text-xs text-indigo-600 hover:text-indigo-700 hover:underline"
+                  href={resource.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {resource.url}
+                </a>
                 <p className="mt-2 text-sm leading-relaxed text-slate-600">{resource.reason}</p>
+                {"highlights" in resource && resource.highlights.length > 0 ? (
+                  <div className="mt-3 rounded-md bg-slate-50 px-3 py-2">
+                    <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Source highlights
+                    </p>
+                    <ul className="mt-2 space-y-1 text-sm leading-relaxed text-slate-600">
+                      {resource.highlights.map((highlight) => (
+                        <li key={highlight}>{highlight}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
               </div>
             </div>
           </li>

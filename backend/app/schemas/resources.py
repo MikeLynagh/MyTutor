@@ -18,6 +18,7 @@ class CuratedResource(BaseModel):
     url: str
     type: ResourceType = "other"
     reason: str
+    highlights: list[str] = Field(default_factory=list)
 
 
 class RejectedResource(BaseModel):

@@ -190,8 +190,9 @@ class LessonPlannerAgent:
                         "url": source.url,
                         "reason": source.reason,
                         "type": source.type,
+                        "highlights": source.highlights[:2],
                     }
-                    for source in selected_sources[:5]
+                    for source in selected_sources[:3]
                 ],
                 "requirements": {
                     "minimum_objectives": 3,
