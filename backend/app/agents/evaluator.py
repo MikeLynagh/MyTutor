@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 class EvaluatorAgent:
     def __init__(self, llm_client: LLMClient | None = None):
         self.llm_client = llm_client or LLMClient()
+        self.last_fallback_used = False
 
     def evaluate_answer(
         self,
@@ -21,6 +22,7 @@ class EvaluatorAgent:
         assessment: Assessment,
         learner_answer: str,
     ) -> EvaluationResult:
+        self.last_fallback_used = False
         generated = self._evaluate_with_llm(
             objective=objective,
             assessment=assessment,
@@ -29,6 +31,7 @@ class EvaluatorAgent:
         if generated is not None:
             return generated
 
+        self.last_fallback_used = True
         return self._fallback_evaluation(
             objective=objective,
             assessment=assessment,

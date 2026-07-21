@@ -1,14 +1,21 @@
+import logging
+from time import perf_counter
+
 from fastapi import APIRouter, HTTPException
 
+from app.agents.lesson_generator import LessonGeneratorAgent
 from app.agents.lesson_planner import LessonPlannerAgent
 from app.agents.resource_curator import ResourceCuratorAgent
 from app.models.memory_store import memory_store
 from app.schemas.mission_plan import MissionPlanRequest, MissionPlanResponse
 from app.schemas.resources import CuratedResource
+from app.services.event_logger import event_logger
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 resource_curator = ResourceCuratorAgent()
+lesson_generator = LessonGeneratorAgent()
 lesson_planner = LessonPlannerAgent()
 
 
@@ -24,6 +31,7 @@ def get_mission_plan(mission_id: str):
 
 @router.post("/missions/{mission_id}/plan", response_model=MissionPlanResponse)
 def create_mission_plan(mission_id: str, payload: MissionPlanRequest):
+    started_at = perf_counter()
     mission = memory_store.get_mission(mission_id)
     curated = resource_curator.curate(
         goal=payload.goal,
@@ -32,6 +40,18 @@ def create_mission_plan(mission_id: str, payload: MissionPlanRequest):
         current_level=mission.current_level if mission else None,
         success_criteria=mission.success_criteria if mission else None,
     )
+    if resource_curator.last_fallback_used:
+        event_logger.log_event(
+            event_type="fallback_used",
+            mission_id=mission_id,
+            agent_name="ResourceCuratorAgent",
+            fallback_used=True,
+            metadata={
+                "operation": "resource_curation",
+                "search_error": resource_curator.last_search_error,
+            },
+        )
+
     learning_plan = lesson_planner.generate_plan(
         goal=payload.goal,
         current_level=mission.current_level if mission else None,
@@ -39,6 +59,15 @@ def create_mission_plan(mission_id: str, payload: MissionPlanRequest):
         selected_sources=[CuratedResource.model_validate(source) for source in curated["selected_sources"]],
         source_summary=curated["source_summary"],
     )
+    if lesson_planner.last_fallback_used:
+        event_logger.log_event(
+            event_type="fallback_used",
+            mission_id=mission_id,
+            agent_name="LessonPlannerAgent",
+            fallback_used=True,
+            metadata={"operation": "lesson_planning"},
+        )
+
     response = MissionPlanResponse(
         mission_id=mission_id,
         selected_sources=curated["selected_sources"],
@@ -50,4 +79,81 @@ def create_mission_plan(mission_id: str, payload: MissionPlanRequest):
         diagnostic_questions=learning_plan.diagnostic_questions,
     )
     memory_store.save_mission_plan(mission_id, response)
+    event_logger.log_event(
+        event_type="plan_created",
+        mission_id=mission_id,
+        agent_name="ResourceCuratorAgent,LessonPlannerAgent",
+        latency_ms=_elapsed_ms(started_at),
+        fallback_used=resource_curator.last_fallback_used or lesson_planner.last_fallback_used,
+        metadata={
+            "source_mode": payload.source_mode,
+            "selected_source_count": len(response.selected_sources),
+            "rejected_source_count": len(response.rejected_sources),
+            "objective_count": len(response.objectives),
+            "diagnostic_question_count": len(response.diagnostic_questions),
+            "mission_type": response.mission_type,
+            "recommended_learning_approach": response.recommended_learning_approach,
+        },
+    )
+    _generate_first_lesson_if_possible(mission_id=mission_id, mission_plan=response)
     return response
+
+
+def _generate_first_lesson_if_possible(*, mission_id: str, mission_plan: MissionPlanResponse) -> None:
+    mission = memory_store.get_mission(mission_id)
+    if mission is None or not mission_plan.objectives:
+        return
+
+    objective = mission_plan.objectives[0]
+    started_at = perf_counter()
+    try:
+        lesson = lesson_generator.generate_lesson(
+            mission_goal=mission.goal,
+            current_level=mission.current_level,
+            learning_preference=mission.learning_preference,
+            objective=objective,
+            source_summary=mission_plan.source_summary,
+            selected_sources=mission_plan.selected_sources,
+            recent_errors=[],
+        )
+    except Exception:
+        logger.exception("First lesson eager generation failed for mission %s", mission_id)
+        event_logger.log_event(
+            event_type="agent_error",
+            mission_id=mission_id,
+            objective_id=objective.id,
+            agent_name="LessonGeneratorAgent",
+            latency_ms=_elapsed_ms(started_at),
+            metadata={"operation": "first_lesson_eager_generation"},
+        )
+        return
+
+    memory_store.save_lesson(mission_id, lesson)
+    event_logger.log_event(
+        event_type="lesson_generated",
+        mission_id=mission_id,
+        objective_id=lesson.objective_id,
+        lesson_id=lesson.lesson_id,
+        agent_name="LessonGeneratorAgent",
+        latency_ms=_elapsed_ms(started_at),
+        fallback_used=lesson_generator.last_fallback_used,
+        metadata={
+            "eager": True,
+            "lesson_title": lesson.title,
+            "assessment_type": lesson.assessment.type,
+        },
+    )
+    if lesson_generator.last_fallback_used:
+        event_logger.log_event(
+            event_type="fallback_used",
+            mission_id=mission_id,
+            objective_id=lesson.objective_id,
+            lesson_id=lesson.lesson_id,
+            agent_name="LessonGeneratorAgent",
+            fallback_used=True,
+            metadata={"operation": "first_lesson_eager_generation"},
+        )
+
+
+def _elapsed_ms(started_at: float) -> int:
+    return round((perf_counter() - started_at) * 1000)

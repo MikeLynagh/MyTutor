@@ -16,6 +16,7 @@ class LessonGeneratorAgent:
     def __init__(self, llm_client: LLMClient | None = None, sanitizer: LessonSanitizer | None = None):
         self.llm_client = llm_client or LLMClient()
         self.sanitizer = sanitizer or LessonSanitizer()
+        self.last_fallback_used = False
 
     def generate_lesson(
         self,
@@ -28,6 +29,7 @@ class LessonGeneratorAgent:
         selected_sources: list[CuratedResource] | None = None,
         recent_errors: list[str] | None = None,
     ) -> LessonArtifact:
+        self.last_fallback_used = False
         lesson_id = str(uuid4())
         generated = self._generate_with_llm(
             mission_goal=mission_goal,
@@ -46,6 +48,7 @@ class LessonGeneratorAgent:
                 return generated
             logger.warning("LLM lesson output failed validation for objective %s", objective.id)
 
+        self.last_fallback_used = True
         fallback = self._build_fallback_lesson(
             lesson_id=lesson_id,
             mission_goal=mission_goal,
