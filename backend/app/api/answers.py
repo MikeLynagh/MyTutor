@@ -81,6 +81,14 @@ def submit_answer(mission_id: str, payload: AnswerSubmission):
         mission_id=mission_id,
         next_task=next_task,
     )
+
+    memory_store.save_answer_evaluation(
+        mission_id=mission_id,
+        submission=payload,
+        evaluation=evaluation,
+        mastery=mastery,
+        next_task=next_task,
+    )
     
     return AnswerEvaluationWithMasteryResponse(
         evaluation=evaluation,
