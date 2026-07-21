@@ -10,6 +10,8 @@ class ResourceCuratorAgent:
     def __init__(self, search_service: WebSearchService | None = None, llm_client: LLMClient | None = None):
         self.search_service = search_service or WebSearchService()
         self.llm_client = llm_client or LLMClient()
+        self.last_fallback_used = False
+        self.last_search_error: str | None = None
 
 
     def curate(
@@ -20,6 +22,8 @@ class ResourceCuratorAgent:
         current_level: CurrentLevel | None = None,
         success_criteria: str | None = None,
     ):
+        self.last_fallback_used = False
+        self.last_search_error = None
         normalized_goal = goal.lower()
         selected_sources = []
         rejected_sources = []
@@ -31,6 +35,8 @@ class ResourceCuratorAgent:
                 search_results = self.search_service.search(query=goal)
             except WebSearchError as exc:
                 search_error = str(exc)
+                self.last_search_error = search_error
+                self.last_fallback_used = True
 
             llm_bundle = self._curate_with_llm(
                 goal=goal,
@@ -70,6 +76,7 @@ class ResourceCuratorAgent:
                     if "rubik" in normalized_goal or "cube" in normalized_goal
                     else "guided_foundations"
                 )
+                self.last_fallback_used = True
         else:
             source_summary = self._build_general_summary(
                 goal=goal,

@@ -1,3 +1,5 @@
+from time import perf_counter
+
 from fastapi import APIRouter, HTTPException
 
 from app.agents.lesson_generator import LessonGeneratorAgent
@@ -7,6 +9,7 @@ from app.schemas.lesson import LessonStartResponse, NextTaskResponse
 from app.schemas.mastery import NextLearningTask
 from app.schemas.mission_plan import MissionPlanResponse
 from app.schemas.plan import Objective
+from app.services.event_logger import event_logger
 
 router = APIRouter()
 
@@ -16,6 +19,7 @@ lesson_planner = LessonPlannerAgent()
 
 @router.post("/missions/{mission_id}/lessons/start", response_model=LessonStartResponse)
 def start_lesson(mission_id: str, force: bool = False):
+    started_at = perf_counter()
     mission = memory_store.get_mission(mission_id)
     if mission is None:
         raise HTTPException(status_code=404, detail="Mission not found")
@@ -48,6 +52,14 @@ def start_lesson(mission_id: str, force: bool = False):
 
     existing_lesson = memory_store.get_lesson(mission_id, objective.id)
     if existing_lesson is not None and not force:
+        event_logger.log_event(
+            event_type="lesson_retrieved",
+            mission_id=mission_id,
+            objective_id=objective.id,
+            lesson_id=existing_lesson.lesson_id,
+            latency_ms=_elapsed_ms(started_at),
+            metadata={"force": force, "route": "lessons_start"},
+        )
         return LessonStartResponse(mission_id=mission_id, objective_id=objective.id, lesson=existing_lesson)
 
     lesson = lesson_generator.generate_lesson(
@@ -60,11 +72,36 @@ def start_lesson(mission_id: str, force: bool = False):
         recent_errors=[],
     )
     memory_store.save_lesson(mission_id, lesson)
+    event_logger.log_event(
+        event_type="lesson_generated",
+        mission_id=mission_id,
+        objective_id=lesson.objective_id,
+        lesson_id=lesson.lesson_id,
+        agent_name="LessonGeneratorAgent",
+        latency_ms=_elapsed_ms(started_at),
+        fallback_used=lesson_generator.last_fallback_used,
+        metadata={
+            "force": force,
+            "route": "lessons_start",
+            "assessment_type": lesson.assessment.type,
+        },
+    )
+    if lesson_generator.last_fallback_used:
+        event_logger.log_event(
+            event_type="fallback_used",
+            mission_id=mission_id,
+            objective_id=lesson.objective_id,
+            lesson_id=lesson.lesson_id,
+            agent_name="LessonGeneratorAgent",
+            fallback_used=True,
+            metadata={"operation": "lesson_start_generation"},
+        )
     return LessonStartResponse(mission_id=mission_id, objective_id=objective.id, lesson=lesson)
 
 
 @router.post("/missions/{mission_id}/tasks/next", response_model=NextTaskResponse)
 def next_task(mission_id: str):
+    started_at = perf_counter()
     mission = memory_store.get_mission(mission_id)
     if mission is None:
         raise HTTPException(status_code=404, detail="Mission not found")
@@ -81,6 +118,16 @@ def next_task(mission_id: str):
         mission_plan=mission_plan,
         next_task=latest_next_task,
     )
+    event_logger.log_event(
+        event_type="next_task_started",
+        mission_id=mission_id,
+        objective_id=objective.id,
+        next_task_type=latest_next_task.type,
+        metadata={
+            "target_objective_id": latest_next_task.target_objective_id,
+            "resolved_objective_id": objective.id,
+        },
+    )
     objective_state = memory_store.get_objective_mastery(
         mission_id=mission_id,
         objective_id=objective.id,
@@ -88,6 +135,15 @@ def next_task(mission_id: str):
 
     existing_lesson = memory_store.get_lesson(mission_id, objective.id)
     if latest_next_task.type == "advance" and existing_lesson is not None:
+        event_logger.log_event(
+            event_type="lesson_retrieved",
+            mission_id=mission_id,
+            objective_id=objective.id,
+            lesson_id=existing_lesson.lesson_id,
+            next_task_type=latest_next_task.type,
+            latency_ms=_elapsed_ms(started_at),
+            metadata={"route": "tasks_next"},
+        )
         return NextTaskResponse(
             mission_id=mission_id,
             objective_id=objective.id,
@@ -105,6 +161,31 @@ def next_task(mission_id: str):
         recent_errors=objective_state.recent_errors,
     )
     memory_store.save_lesson(mission_id, lesson)
+    event_logger.log_event(
+        event_type="lesson_generated",
+        mission_id=mission_id,
+        objective_id=lesson.objective_id,
+        lesson_id=lesson.lesson_id,
+        agent_name="LessonGeneratorAgent",
+        next_task_type=latest_next_task.type,
+        latency_ms=_elapsed_ms(started_at),
+        fallback_used=lesson_generator.last_fallback_used,
+        metadata={
+            "route": "tasks_next",
+            "recent_error_count": len(objective_state.recent_errors),
+            "assessment_type": lesson.assessment.type,
+        },
+    )
+    if lesson_generator.last_fallback_used:
+        event_logger.log_event(
+            event_type="fallback_used",
+            mission_id=mission_id,
+            objective_id=lesson.objective_id,
+            lesson_id=lesson.lesson_id,
+            agent_name="LessonGeneratorAgent",
+            fallback_used=True,
+            metadata={"operation": "next_task_generation"},
+        )
     return NextTaskResponse(
         mission_id=mission_id,
         objective_id=objective.id,
@@ -137,3 +218,7 @@ def resolve_next_task_objective(
         return mission_plan.objectives[current_index]
 
     return mission_plan.objectives[next_index]
+
+
+def _elapsed_ms(started_at: float) -> int:
+    return round((perf_counter() - started_at) * 1000)

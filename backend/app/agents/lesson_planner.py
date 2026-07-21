@@ -9,6 +9,7 @@ from app.services.llm_client import LLMClient, LLMClientError
 class LessonPlannerAgent:
     def __init__(self, llm_client: LLMClient | None = None):
         self.llm_client = llm_client or LLMClient()
+        self.last_fallback_used = False
 
     def generate_plan(
         self,
@@ -18,6 +19,7 @@ class LessonPlannerAgent:
         selected_sources: list[CuratedResource] | None = None,
         source_summary: str | None = None,
     ) -> LearningPlan:
+        self.last_fallback_used = False
         normalized_goal = goal.lower()
 
         if self._is_rubik_mission(normalized_goal):
@@ -33,6 +35,7 @@ class LessonPlannerAgent:
         if llm_plan is not None and self._is_valid_generated_plan(llm_plan):
             return llm_plan
 
+        self.last_fallback_used = True
         return self._build_goal_shaped_fallback(goal=goal, normalized_goal=normalized_goal)
 
     def _build_rubik_plan(self) -> LearningPlan:

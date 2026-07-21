@@ -1,5 +1,6 @@
 import json
 import re
+from time import perf_counter
 
 from fastapi import APIRouter, HTTPException
 
@@ -8,6 +9,7 @@ from app.schemas.chat import ChatMessage, MissionChatLLMResponse, MissionChatReq
 from app.schemas.lesson import LessonArtifact
 from app.schemas.mission_plan import MissionPlanResponse
 from app.schemas.plan import Objective
+from app.services.event_logger import event_logger
 from app.services.llm_client import LLMClient, LLMClientError
 
 router = APIRouter()
@@ -16,6 +18,7 @@ llm_client = LLMClient()
 
 @router.post("/missions/{mission_id}/chat", response_model=MissionChatResponse)
 def chat_with_mission_tutor(mission_id: str, payload: MissionChatRequest):
+    started_at = perf_counter()
     mission = memory_store.get_mission(mission_id)
     if mission is None:
         raise HTTPException(status_code=404, detail="Mission not found")
@@ -87,8 +90,30 @@ def chat_with_mission_tutor(mission_id: str, payload: MissionChatRequest):
             user_prompt=user_prompt,
         )
     except LLMClientError as exc:
+        event_logger.log_event(
+            event_type="agent_error",
+            mission_id=mission_id,
+            objective_id=current_objective.id if current_objective is not None else None,
+            lesson_id=current_lesson.lesson_id if current_lesson is not None else None,
+            agent_name="MissionTutorChat",
+            latency_ms=_elapsed_ms(started_at),
+            metadata={"operation": "chat_response", "error": str(exc)[:500]},
+        )
         raise HTTPException(status_code=502, detail=f"Tutor chat failed: {exc}") from exc
 
+    event_logger.log_event(
+        event_type="chat_response_generated",
+        mission_id=mission_id,
+        objective_id=current_objective.id if current_objective is not None else None,
+        lesson_id=current_lesson.lesson_id if current_lesson is not None else None,
+        agent_name="MissionTutorChat",
+        latency_ms=_elapsed_ms(started_at),
+        metadata={
+            "history_count": len(payload.history),
+            "message_length": len(payload.message),
+            "response_length": len(response.content.strip()),
+        },
+    )
     return MissionChatResponse(message=ChatMessage(role="assistant", content=response.content.strip()))
 
 
@@ -159,3 +184,7 @@ def _truncate(value: str, limit: int) -> str:
         return value
 
     return f"{value[:limit].rstrip()}..."
+
+
+def _elapsed_ms(started_at: float) -> int:
+    return round((perf_counter() - started_at) * 1000)

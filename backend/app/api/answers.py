@@ -1,8 +1,11 @@
+from time import perf_counter
+
 from fastapi import APIRouter, HTTPException
 
 from app.agents.evaluator import EvaluatorAgent
 from app.models.memory_store import memory_store
 from app.schemas.answer import AnswerEvaluationWithMasteryResponse, AnswerSubmission
+from app.services.event_logger import event_logger
 from app.services.mastery_tracker import MasteryTracker
 from app.services.task_router import TaskRouter
 
@@ -14,6 +17,7 @@ task_router = TaskRouter()
 
 @router.post("/missions/{mission_id}/answers", response_model=AnswerEvaluationWithMasteryResponse)
 def submit_answer(mission_id: str, payload: AnswerSubmission):
+    started_at = perf_counter()
     mission = memory_store.get_mission(mission_id)
     if mission is None:
         raise HTTPException(status_code=404, detail="Mission not found")
@@ -33,11 +37,48 @@ def submit_answer(mission_id: str, payload: AnswerSubmission):
     if objective is None:
         raise HTTPException(status_code=404, detail="Objective not found in mission plan")
 
+    event_logger.log_event(
+        event_type="answer_submitted",
+        mission_id=mission_id,
+        objective_id=payload.objective_id,
+        lesson_id=payload.lesson_id,
+        metadata={
+            "answer_length": len(payload.answer),
+            "assessment_type": lesson.assessment.type,
+        },
+    )
+
+    evaluation_started_at = perf_counter()
     evaluation = evaluator.evaluate_answer(
         objective=objective,
         assessment=lesson.assessment,
         learner_answer=payload.answer,
     )
+    event_logger.log_event(
+        event_type="evaluation_completed",
+        mission_id=mission_id,
+        objective_id=payload.objective_id,
+        lesson_id=payload.lesson_id,
+        agent_name="EvaluatorAgent",
+        score=evaluation.score,
+        latency_ms=_elapsed_ms(evaluation_started_at),
+        fallback_used=evaluator.last_fallback_used,
+        metadata={
+            "is_correct": evaluation.is_correct,
+            "missing_point_count": len(evaluation.missing_points),
+            "has_misconception": evaluation.misconception is not None,
+        },
+    )
+    if evaluator.last_fallback_used:
+        event_logger.log_event(
+            event_type="fallback_used",
+            mission_id=mission_id,
+            objective_id=payload.objective_id,
+            lesson_id=payload.lesson_id,
+            agent_name="EvaluatorAgent",
+            fallback_used=True,
+            metadata={"operation": "answer_evaluation"},
+        )
 
     objective_state = memory_store.get_objective_mastery(
         mission_id=mission_id,
@@ -65,6 +106,19 @@ def submit_answer(mission_id: str, payload: AnswerSubmission):
         mission_id=mission_id,
         objective_state=objective_state,
     )
+    event_logger.log_event(
+        event_type="mastery_updated",
+        mission_id=mission_id,
+        objective_id=payload.objective_id,
+        lesson_id=payload.lesson_id,
+        score=evaluation.score,
+        mastery_before=mastery.mastery_before,
+        mastery_after=mastery.mastery_after,
+        metadata={
+            "attempts": objective_state.attempts,
+            "recent_error_count": len(objective_state.recent_errors),
+        },
+    )
 
     next_task = task_router.route(
         objective_id=objective.id,
@@ -81,6 +135,21 @@ def submit_answer(mission_id: str, payload: AnswerSubmission):
         mission_id=mission_id,
         next_task=next_task,
     )
+    event_logger.log_event(
+        event_type="next_task_selected",
+        mission_id=mission_id,
+        objective_id=objective.id,
+        lesson_id=payload.lesson_id,
+        score=evaluation.score,
+        mastery_before=mastery.mastery_before,
+        mastery_after=mastery.mastery_after,
+        next_task_type=next_task.type,
+        latency_ms=_elapsed_ms(started_at),
+        metadata={
+            "response_type": next_task.response_type,
+            "target_objective_id": next_task.target_objective_id,
+        },
+    )
 
     memory_store.save_answer_evaluation(
         mission_id=mission_id,
@@ -89,9 +158,13 @@ def submit_answer(mission_id: str, payload: AnswerSubmission):
         mastery=mastery,
         next_task=next_task,
     )
-    
+
     return AnswerEvaluationWithMasteryResponse(
         evaluation=evaluation,
         mastery=mastery,
         next_task=next_task,
     )
+
+
+def _elapsed_ms(started_at: float) -> int:
+    return round((perf_counter() - started_at) * 1000)
