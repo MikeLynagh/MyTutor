@@ -42,3 +42,10 @@ target/
 env/
 venv/
 ENV/
+
+# Local persistence
+data/
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.sqlite3-*

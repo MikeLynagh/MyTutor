@@ -34,6 +34,7 @@ export function MissionTutorChat({ missionId }: MissionTutorChatProps) {
   const [isSending, setIsSending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [currentLesson, setCurrentLesson] = React.useState<LessonStartResponse | null>(null);
+  const messagesEndRef = React.useRef<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
     const cachedChat = window.sessionStorage.getItem(chatStorageKey(missionId));
@@ -68,6 +69,10 @@ export function MissionTutorChat({ missionId }: MissionTutorChatProps) {
   React.useEffect(() => {
     window.sessionStorage.setItem(chatStorageKey(missionId), JSON.stringify(messages));
   }, [messages, missionId]);
+
+  React.useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ block: "end" });
+  }, [messages, isSending, error]);
 
   async function sendMessage(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -112,8 +117,8 @@ export function MissionTutorChat({ missionId }: MissionTutorChatProps) {
   }
 
   return (
-    <aside className="flex h-[300px] flex-col border-b border-slate-200/80 bg-white lg:h-auto lg:w-[42%] lg:border-r lg:border-b-0">
-      <div className="flex items-center justify-between border-b border-slate-200/80 px-5 py-3">
+    <aside className="flex h-[300px] min-h-0 flex-col overflow-hidden border-b border-slate-200/80 bg-white lg:h-auto lg:w-[42%] lg:border-r lg:border-b-0">
+      <div className="flex shrink-0 items-center justify-between border-b border-slate-200/80 px-5 py-3">
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-indigo-500" />
           <span className="text-sm font-medium text-slate-700">Tutor</span>
@@ -128,35 +133,38 @@ export function MissionTutorChat({ missionId }: MissionTutorChatProps) {
         </Button>
       </div>
 
-      <ScrollArea className="flex-1 px-5 py-4">
-        <div className="space-y-4">
-          {messages.map((message, index) => (
-            <ChatBubble key={`${message.role}-${index}-${message.content.slice(0, 16)}`} message={message} />
-          ))}
-          {isSending ? (
-            <div className="flex items-start gap-3">
-              <Avatar className="mt-0.5 h-7 w-7">
-                <AvatarFallback className="bg-indigo-100 text-xs font-medium text-indigo-700">
-                  T
-                </AvatarFallback>
-              </Avatar>
-              <div className="rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-500">
-                <span className="inline-flex items-center gap-2">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Tutor is thinking
-                </span>
+      <ScrollArea className="min-h-0 flex-1 overflow-hidden">
+        <div className="px-5 py-4">
+          <div className="space-y-4">
+            {messages.map((message, index) => (
+              <ChatBubble key={`${message.role}-${index}-${message.content.slice(0, 16)}`} message={message} />
+            ))}
+            {isSending ? (
+              <div className="flex items-start gap-3">
+                <Avatar className="mt-0.5 h-7 w-7">
+                  <AvatarFallback className="bg-indigo-100 text-xs font-medium text-indigo-700">
+                    T
+                  </AvatarFallback>
+                </Avatar>
+                <div className="rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Tutor is thinking
+                  </span>
+                </div>
               </div>
-            </div>
-          ) : null}
-          {error ? (
-            <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-              {error}
-            </div>
-          ) : null}
+            ) : null}
+            {error ? (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                {error}
+              </div>
+            ) : null}
+            <div ref={messagesEndRef} />
+          </div>
         </div>
       </ScrollArea>
 
-      <form className="border-t border-slate-200/80 bg-white px-4 py-3" onSubmit={sendMessage}>
+      <form className="shrink-0 border-t border-slate-200/80 bg-white px-4 py-3" onSubmit={sendMessage}>
         <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5">
           <MessageSquare className="h-4 w-4 shrink-0 text-slate-400" />
           <input

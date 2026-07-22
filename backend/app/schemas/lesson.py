@@ -17,12 +17,20 @@ class PracticalTask(BaseModel):
     success_criteria: str
 
 
+class PracticeTask(BaseModel):
+    id: str
+    prompt: str
+    purpose: str
+    success_criteria: str
+
+
 class LessonArtifact(BaseModel):
     lesson_id: str
     objective_id: str
     title: str
     lesson_html: str
     key_points: list[str] = Field(default_factory=list)
+    practice_tasks: list[PracticeTask] = Field(default_factory=list)
     practical_task: PracticalTask
     assessment: Assessment
 

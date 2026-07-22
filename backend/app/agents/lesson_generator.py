@@ -2,7 +2,7 @@ import json
 import logging
 from uuid import uuid4
 
-from app.schemas.lesson import Assessment, LessonArtifact, PracticalTask
+from app.schemas.lesson import Assessment, LessonArtifact, PracticalTask, PracticeTask
 from app.schemas.mission import CurrentLevel, LearningPreference
 from app.schemas.plan import Objective
 from app.schemas.resources import CuratedResource
@@ -44,6 +44,7 @@ class LessonGeneratorAgent:
         if generated is not None:
             generated.lesson_id = lesson_id
             generated.lesson_html = self.sanitizer.sanitize(generated.lesson_html)
+            generated.practice_tasks = self._normalise_practice_tasks(generated, objective)
             if self._is_valid_lesson(generated):
                 return generated
             logger.warning("LLM lesson output failed validation for objective %s", objective.id)
@@ -75,6 +76,7 @@ class LessonGeneratorAgent:
             "Do not change the objective. "
             "Return valid json only and follow the schema exactly. "
             "Keep the lesson concise, stepwise, and aligned to the assessment. "
+            "Teach one small idea at a time, then give two short practice tasks before the final assessment. "
             "Use source highlights as grounding when they are relevant, but do not copy long passages. "
             "Use safe semantic HTML to reduce cognitive load when useful. "
             "Visual structure should clarify comparisons, sequences, examples, checks, diagrams, tables, or callouts. "
@@ -144,6 +146,17 @@ class LessonGeneratorAgent:
                         "code_block",
                     ],
                     "practical_task_required": True,
+                    "practice_tasks_required": {
+                        "count": 2,
+                        "practice_1": "Directly apply the lesson idea in a low-friction way.",
+                        "practice_2": "Apply the same idea with changed surface details or a slightly harder variation.",
+                        "constraints": [
+                            "Keep each practice prompt short.",
+                            "Make each task answerable without hidden context.",
+                            "Avoid trivia unless the objective is explicitly about memorising facts.",
+                            "Use code, commands, examples, or concrete actions when they fit the topic.",
+                        ],
+                    },
                     "assessment_alignment_required": True,
                     "one_concrete_example_max": True,
                     "do_not_include": [
@@ -212,6 +225,20 @@ class LessonGeneratorAgent:
                 instruction=f"Try a small guided exercise related to {mission_goal}.",
                 success_criteria=objective.success_criteria,
             ),
+            practice_tasks=[
+                PracticeTask(
+                    id="practice_1",
+                    prompt=f"Apply the key idea from {objective.title} to one simple example.",
+                    purpose="direct_application",
+                    success_criteria=objective.success_criteria,
+                ),
+                PracticeTask(
+                    id="practice_2",
+                    prompt=f"Try the same idea again with one changed detail, then note what stayed the same.",
+                    purpose="variation",
+                    success_criteria=objective.success_criteria,
+                ),
+            ],
             assessment=Assessment(
                 type=objective.assessment_type,
                 question=f"Explain or demonstrate the core idea behind {objective.title}.",
@@ -262,6 +289,20 @@ class LessonGeneratorAgent:
                 instruction="Pick up your cube and identify four edge pieces and four corner pieces.",
                 success_criteria="The learner can correctly distinguish centre, edge, and corner pieces.",
             ),
+            practice_tasks=[
+                PracticeTask(
+                    id="practice_1",
+                    prompt="Find one centre, one edge, and one corner on the cube.",
+                    purpose="direct_application",
+                    success_criteria="Correctly identifies the three piece types.",
+                ),
+                PracticeTask(
+                    id="practice_2",
+                    prompt="Turn the cube to a different side and find another centre, edge, and corner.",
+                    purpose="variation",
+                    success_criteria="Can repeat the identification from a new cube orientation.",
+                ),
+            ],
             assessment=Assessment(
                 type="short_written_answer",
                 question="Explain the difference between centre, edge, and corner pieces in your own words.",
@@ -272,6 +313,45 @@ class LessonGeneratorAgent:
                     "Mentions corners have three colours",
                 ],
             ),
+        )
+
+    def _normalise_practice_tasks(self, lesson: LessonArtifact, objective: Objective) -> list[PracticeTask]:
+        valid_tasks = [
+            practice_task
+            for practice_task in lesson.practice_tasks
+            if practice_task.prompt.strip() and practice_task.success_criteria.strip()
+        ]
+        normalised_tasks: list[PracticeTask] = []
+
+        for index, practice_task in enumerate(valid_tasks[:2], start=1):
+            normalised_tasks.append(
+                PracticeTask(
+                    id=practice_task.id.strip() or f"practice_{index}",
+                    prompt=practice_task.prompt.strip(),
+                    purpose=practice_task.purpose.strip() or ("direct_application" if index == 1 else "variation"),
+                    success_criteria=practice_task.success_criteria.strip(),
+                )
+            )
+
+        while len(normalised_tasks) < 2:
+            normalised_tasks.append(self._build_default_practice_task(lesson, objective, len(normalised_tasks) + 1))
+
+        return normalised_tasks
+
+    def _build_default_practice_task(self, lesson: LessonArtifact, objective: Objective, index: int) -> PracticeTask:
+        if index == 1:
+            return PracticeTask(
+                id="practice_1",
+                prompt=f"Apply the key idea from {lesson.title} to one simple example.",
+                purpose="direct_application",
+                success_criteria=lesson.practical_task.success_criteria or objective.success_criteria,
+            )
+
+        return PracticeTask(
+            id="practice_2",
+            prompt="Try the same idea again with one changed detail, then note what stayed the same.",
+            purpose="variation",
+            success_criteria=objective.success_criteria,
         )
 
     def _is_rubik_mission(self, normalized_goal: str) -> bool:
@@ -298,6 +378,18 @@ class LessonGeneratorAgent:
 
         if not lesson.practical_task or not lesson.practical_task.instruction.strip() or not lesson.practical_task.success_criteria.strip():
             return False
+
+        if len(lesson.practice_tasks) != 2:
+            return False
+
+        for practice_task in lesson.practice_tasks:
+            if (
+                not practice_task.id.strip()
+                or not practice_task.prompt.strip()
+                or not practice_task.purpose.strip()
+                or not practice_task.success_criteria.strip()
+            ):
+                return False
 
         if not lesson.assessment.question.strip() or not lesson.assessment.rubric:
             return False

@@ -8,7 +8,7 @@ import { ChevronLeft, ChevronRight, Loader2, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
-import type { answerEvaluationWithMasteryResponse, LessonStartResponse, Mission } from "@/types/mission";
+import type { answerEvaluationWithMasteryResponse, LessonStartResponse, Mission, PracticeTask } from "@/types/mission";
 import {
   answerEvaluationWithMasteryResponseSchema,
   lessonStartResponseSchema,
@@ -26,6 +26,10 @@ function missionStorageKey(missionId: string) {
 
 function formatAssessmentType(type: string) {
   return type.replaceAll("_", " ");
+}
+
+function formatPracticePurpose(purpose: string) {
+  return purpose.replaceAll("_", " ");
 }
 
 function checklistItemsFromSuccessCriteria(successCriteria: string) {
@@ -370,6 +374,10 @@ export default function MissionLessonPage() {
         </ul>
       </section>
 
+      {lessonResponse.lesson.practice_tasks.length > 0 ? (
+        <PracticeTasks tasks={lessonResponse.lesson.practice_tasks} />
+      ) : null}
+
       {lessonResponse.lesson.practical_task ? (
         <section className="mt-8">
           <h2 className="mb-2 text-lg font-semibold text-slate-800">Practical task</h2>
@@ -538,6 +546,28 @@ export default function MissionLessonPage() {
         </Button>
       </div>
     </div>
+  );
+}
+
+function PracticeTasks({ tasks }: { tasks: PracticeTask[] }) {
+  return (
+    <section className="mt-8">
+      <h2 className="mb-2 text-lg font-semibold text-slate-800">Practice rounds</h2>
+      <ol className="space-y-3">
+        {tasks.map((task, index) => (
+          <li key={task.id || `${task.prompt}-${index}`} className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+            <p className="text-xs font-medium uppercase tracking-wider text-indigo-600">
+              Round {index + 1} · {formatPracticePurpose(task.purpose)}
+            </p>
+            <p className="mt-2 text-sm leading-relaxed text-slate-700">{task.prompt}</p>
+            <p className="mt-3 text-sm leading-relaxed text-slate-600">
+              <strong className="font-semibold text-slate-800">Success criteria:</strong>{" "}
+              {task.success_criteria}
+            </p>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 

@@ -133,12 +133,20 @@ export const practicalTaskSchema = z.object({
   success_criteria: z.string(),
 });
 
+export const practiceTaskSchema = z.object({
+  id: z.string(),
+  prompt: z.string(),
+  purpose: z.string(),
+  success_criteria: z.string(),
+});
+
 export const lessonArtifactSchema = z.object({
   lesson_id: z.string(),
   objective_id: z.string(),
   title: z.string(),
   lesson_html: z.string(),
   key_points: z.array(z.string()),
+  practice_tasks: z.array(practiceTaskSchema).default([]),
   practical_task: practicalTaskSchema,
   assessment: assessmentSchema,
 });
@@ -273,6 +281,7 @@ export type CuratedResourceBundle = z.infer<typeof curatedResourceBundleSchema>;
 export type LearningPlan = z.infer<typeof learningPlanSchema>;
 export type Assessment = z.infer<typeof assessmentSchema>;
 export type PracticalTask = z.infer<typeof practicalTaskSchema>;
+export type PracticeTask = z.infer<typeof practiceTaskSchema>;
 export type LessonArtifact = z.infer<typeof lessonArtifactSchema>;
 export type LessonStartResponse = z.infer<typeof lessonStartResponseSchema>;
 export type NextTaskResponse = z.infer<typeof nextTaskResponseSchema>;

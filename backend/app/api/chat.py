@@ -169,6 +169,7 @@ def _lesson_context(lesson: LessonArtifact | None):
         "objective_id": lesson.objective_id,
         "lesson_text": _truncate(_html_to_text(lesson.lesson_html), 2500),
         "key_points": lesson.key_points[:8],
+        "practice_tasks": [practice_task.model_dump() for practice_task in lesson.practice_tasks[:2]],
         "practical_task": lesson.practical_task.model_dump(),
         "assessment": lesson.assessment.model_dump(),
     }

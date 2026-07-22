@@ -115,6 +115,20 @@ class MockLLMProvider:
                         "instruction": "Pick up your cube and identify four edge pieces and four corner pieces.",
                         "success_criteria": "The learner can correctly distinguish centre, edge, and corner pieces.",
                     },
+                    "practice_tasks": [
+                        {
+                            "id": "practice_1",
+                            "prompt": "Find one centre, one edge, and one corner on the cube.",
+                            "purpose": "direct_application",
+                            "success_criteria": "Correctly identifies the three piece types.",
+                        },
+                        {
+                            "id": "practice_2",
+                            "prompt": "Turn the cube to a different side and find another centre, edge, and corner.",
+                            "purpose": "variation",
+                            "success_criteria": "Can repeat the identification from a new cube orientation.",
+                        },
+                    ],
                     "assessment": {
                         "type": "short_written_answer",
                         "question": "Explain the difference between centre, edge, and corner pieces in your own words.",
@@ -149,6 +163,20 @@ class MockLLMProvider:
                         "instruction": f"Complete one guided example related to {title}.",
                         "success_criteria": success_criteria or f"You can demonstrate the core idea behind {title}.",
                     },
+                    "practice_tasks": [
+                        {
+                            "id": "practice_1",
+                            "prompt": f"Apply the key idea from {title} to one simple example.",
+                            "purpose": "direct_application",
+                            "success_criteria": success_criteria or f"You can demonstrate the core idea behind {title}.",
+                        },
+                        {
+                            "id": "practice_2",
+                            "prompt": "Try the same idea again with one changed detail, then note what stayed the same.",
+                            "purpose": "variation",
+                            "success_criteria": success_criteria or f"You can transfer the idea to a small variation of the task.",
+                        },
+                    ],
                     "assessment": {
                         "type": assessment_type,
                         "question": f"Explain or demonstrate the core idea behind {title}.",

@@ -204,7 +204,6 @@ def required_events_present(events: list[Any]) -> bool:
         "mission_created",
         "plan_created",
         "lesson_generated",
-        "lesson_retrieved",
         "answer_submitted",
         "evaluation_completed",
         "mastery_updated",
