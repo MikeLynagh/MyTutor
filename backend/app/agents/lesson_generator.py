@@ -45,9 +45,14 @@ class LessonGeneratorAgent:
             generated.lesson_id = lesson_id
             generated.lesson_html = self.sanitizer.sanitize(generated.lesson_html)
             generated.practice_tasks = self._normalise_practice_tasks(generated, objective)
-            if self._is_valid_lesson(generated):
+            validation_errors = self._lesson_validation_errors(generated)
+            if not validation_errors:
                 return generated
-            logger.warning("LLM lesson output failed validation for objective %s", objective.id)
+            logger.warning(
+                "LLM lesson output failed validation for objective %s: %s",
+                objective.id,
+                ", ".join(validation_errors),
+            )
 
         self.last_fallback_used = True
         fallback = self._build_fallback_lesson(
@@ -79,6 +84,9 @@ class LessonGeneratorAgent:
             "Teach one small idea at a time, then give two short practice tasks before the final assessment. "
             "Use source highlights as grounding when they are relevant, but do not copy long passages. "
             "Use safe semantic HTML to reduce cognitive load when useful. "
+            "Every full lesson must include one useful visual teaching structure in lesson_html. "
+            "Choose the structure based on the objective: use a table for comparisons, an ordered sequence for workflows, "
+            "a code block for software examples, a flowchart-style text diagram for systems, or a worked example for applied concepts. "
             "Visual structure should clarify comparisons, sequences, examples, checks, diagrams, tables, or callouts. "
             "Do not add decorative visuals."
         )
@@ -142,9 +150,26 @@ class LessonGeneratorAgent:
                         "table",
                         "callout",
                         "worked_example",
-                        "diagram_placeholder",
+                        "flowchart_style_text_diagram",
                         "code_block",
                     ],
+                    "visual_structure_required": {
+                        "count": "at_least_one",
+                        "purpose": "clarify the concept, workflow, decision, system relationship, example, or assessment target",
+                        "allowed_forms": [
+                            "table",
+                            "ordered sequence",
+                            "code block",
+                            "flowchart-style text diagram using safe HTML or preformatted text",
+                            "worked example",
+                            "comparison block",
+                        ],
+                        "do_not_use": [
+                            "decorative graphics",
+                            "empty diagram placeholders",
+                            "visuals that repeat the same text without adding structure",
+                        ],
+                    },
                     "practical_task_required": True,
                     "practice_tasks_required": {
                         "count": 2,
@@ -197,17 +222,38 @@ class LessonGeneratorAgent:
         if self._is_rubik_mission(normalized_goal):
             return self._build_rubik_objective_one_fallback(lesson_id=lesson_id, objective=objective, recent_errors=recent_errors)
 
+        safe_title = escape_text(objective.title)
+        safe_description = escape_text(objective.description)
+        safe_success_criteria = escape_text(objective.success_criteria)
+        safe_goal = escape_text(mission_goal)
         lesson_html = (
             "<article>"
-            f"<h2>{escape_text(objective.title)}</h2>"
-            f"<p>{escape_text(objective.description)}</p>"
+            f"<h2>{safe_title}</h2>"
             "<section>"
-            "<h3>Key idea</h3>"
-            f"<p>{escape_text(objective.success_criteria)}</p>"
+            "<h3>Plain-English explanation</h3>"
+            f"<p>{safe_description}</p>"
+            f"<p>The goal is to make this idea usable: {safe_success_criteria}</p>"
             "</section>"
             "<section>"
-            "<h3>Practice</h3>"
-            f"<p>Work through a small guided example related to {escape_text(mission_goal)}.</p>"
+            "<h3>Why it matters</h3>"
+            f"<p>This step supports your mission to {safe_goal}. It gives you one concrete capability to practise before moving on.</p>"
+            "</section>"
+            "<section class=\"lesson-example\">"
+            "<h3>Concrete example</h3>"
+            f"<p>Take a small example connected to <strong>{safe_title}</strong>. First identify the input or situation, then apply the key idea, then check whether the result meets the success criteria.</p>"
+            "</section>"
+            "<section class=\"lesson-sequence\">"
+            "<h3>Use this sequence</h3>"
+            "<ol>"
+            "<li>State the idea in one sentence.</li>"
+            "<li>Apply it to one simple example.</li>"
+            "<li>Check the result against the success criteria.</li>"
+            "<li>Explain what would change in a slightly different example.</li>"
+            "</ol>"
+            "</section>"
+            "<section class=\"lesson-callout\">"
+            "<h3>Common mistake</h3>"
+            "<p>Do not stop at recognition. A good answer should show that you can apply the idea, not only name it.</p>"
             "</section>"
             "</article>"
         )
@@ -228,13 +274,13 @@ class LessonGeneratorAgent:
             practice_tasks=[
                 PracticeTask(
                     id="practice_1",
-                    prompt=f"Apply the key idea from {objective.title} to one simple example.",
+                    prompt=f"Apply {objective.title} to one simple example and compare the result with the success criteria.",
                     purpose="direct_application",
                     success_criteria=objective.success_criteria,
                 ),
                 PracticeTask(
                     id="practice_2",
-                    prompt=f"Try the same idea again with one changed detail, then note what stayed the same.",
+                    prompt="Try the same idea again with one changed detail, then explain what stayed the same and what changed.",
                     purpose="variation",
                     success_criteria=objective.success_criteria,
                 ),
@@ -316,6 +362,7 @@ class LessonGeneratorAgent:
         )
 
     def _normalise_practice_tasks(self, lesson: LessonArtifact, objective: Objective) -> list[PracticeTask]:
+        original_count = len(lesson.practice_tasks)
         valid_tasks = [
             practice_task
             for practice_task in lesson.practice_tasks
@@ -335,6 +382,15 @@ class LessonGeneratorAgent:
 
         while len(normalised_tasks) < 2:
             normalised_tasks.append(self._build_default_practice_task(lesson, objective, len(normalised_tasks) + 1))
+
+        if len(valid_tasks) != original_count or len(normalised_tasks) != original_count:
+            logger.info(
+                "Repaired practice tasks for objective %s: original_count=%s valid_count=%s final_count=%s",
+                lesson.objective_id,
+                original_count,
+                len(valid_tasks),
+                len(normalised_tasks),
+            )
 
         return normalised_tasks
 
@@ -366,38 +422,40 @@ class LessonGeneratorAgent:
         ]
         return any(indicator in normalized_goal for indicator in rubik_indicators)
 
-    def _is_valid_lesson(self, lesson: LessonArtifact) -> bool:
+    def _lesson_validation_errors(self, lesson: LessonArtifact) -> list[str]:
+        errors: list[str] = []
+
         if not lesson.lesson_id.strip() or not lesson.objective_id.strip() or not lesson.title.strip():
-            return False
+            errors.append("missing_identity_fields")
 
         if not lesson.lesson_html.strip():
-            return False
+            errors.append("missing_lesson_html")
 
         if len(lesson.key_points) < 3:
-            return False
+            errors.append("key_points_count_lt_3")
 
         if not lesson.practical_task or not lesson.practical_task.instruction.strip() or not lesson.practical_task.success_criteria.strip():
-            return False
+            errors.append("missing_practical_task")
 
         if len(lesson.practice_tasks) != 2:
-            return False
+            errors.append("practice_tasks_count_not_2")
 
-        for practice_task in lesson.practice_tasks:
+        for index, practice_task in enumerate(lesson.practice_tasks, start=1):
             if (
                 not practice_task.id.strip()
                 or not practice_task.prompt.strip()
                 or not practice_task.purpose.strip()
                 or not practice_task.success_criteria.strip()
             ):
-                return False
+                errors.append(f"invalid_practice_task_{index}")
 
         if not lesson.assessment.question.strip() or not lesson.assessment.rubric:
-            return False
+            errors.append("missing_assessment_question_or_rubric")
 
         if lesson.assessment.type == "short_written_answer" and not lesson.assessment.expected_answer:
-            return False
+            errors.append("missing_short_written_expected_answer")
 
-        return True
+        return errors
 
 
 def escape_text(value: str) -> str:
