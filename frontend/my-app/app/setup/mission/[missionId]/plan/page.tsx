@@ -48,6 +48,25 @@ const sourceMode = [
     },
 ] as const
 
+const planGenerationStages = [
+    {
+        title: "Searching for resources",
+        description: "The tutor is finding candidate material for your learning goal.",
+    },
+    {
+        title: "Reviewing source quality",
+        description: "The tutor is checking relevance, usefulness, and overlap between resources.",
+    },
+    {
+        title: "Building learning objectives",
+        description: "The tutor is turning your goal into a sequenced mission plan.",
+    },
+    {
+        title: "Saving mission plan",
+        description: "The tutor is storing the plan so you can review it before starting the first lesson.",
+    },
+] as const
+
 
 const formSchema = z.object({
     sourceMode: z.enum(["web", "user_material", "both"], {
@@ -63,6 +82,7 @@ export default function Page() {
     const [mission, setMission] = React.useState<Mission | null>(null);
     const [isLoadingMission, setIsLoadingMission] = React.useState(true);
     const [isGeneratingPlan, setIsGeneratingPlan] = React.useState(false);
+    const generationStage = useTimedStage(isGeneratingPlan, planGenerationStages);
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: {
@@ -167,7 +187,10 @@ export default function Page() {
                                 <div>
                                     <p className="text-sm font-medium text-indigo-950">Generating your mission plan</p>
                                     <p className="mt-1 text-sm leading-relaxed text-indigo-900/80">
-                                        The tutor is reviewing your goal, checking resources, and building the first objective sequence.
+                                        {generationStage.title}
+                                    </p>
+                                    <p className="mt-1 text-sm leading-relaxed text-indigo-900/70">
+                                        {generationStage.description}
                                     </p>
                                 </div>
                             </div>
@@ -252,4 +275,23 @@ export default function Page() {
         </main>
     )
 
+}
+
+function useTimedStage<T extends readonly unknown[]>(isActive: boolean, stages: T): T[number] {
+    const [stageIndex, setStageIndex] = React.useState(0);
+
+    React.useEffect(() => {
+        if (!isActive) {
+            setStageIndex(0);
+            return;
+        }
+
+        const interval = window.setInterval(() => {
+            setStageIndex((current) => Math.min(current + 1, stages.length - 1));
+        }, 4500);
+
+        return () => window.clearInterval(interval);
+    }, [isActive, stages.length]);
+
+    return stages[stageIndex];
 }

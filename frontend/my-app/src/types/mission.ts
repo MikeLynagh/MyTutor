@@ -269,6 +269,7 @@ export type MissionType = z.infer<typeof missionTypeSchema>;
 export type ResourceType = z.infer<typeof resourceTypeSchema>;
 export type AssessmentType = z.infer<typeof assessmentTypeSchema>;
 export type NextActionType = z.infer<typeof nextActionTypeSchema>;
+export type NextLearningTaskType = z.infer<typeof nextLearningTaskTypeSchema>;
 export type NextLearningTask = z.infer<typeof nextLearningTaskSchema>;
 export type MissionCreate = z.infer<typeof missionCreateSchema>;
 export type Mission = z.infer<typeof missionSchema>;
