@@ -14,6 +14,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { loadInitialLesson } from "@/lib/lesson-prefetch";
 import type {
   CuratedResource,
   Mission,
@@ -31,12 +32,15 @@ function missionStorageKey(missionId: string) {
   return `mission:${missionId}`;
 }
 
+type LessonPrefetchStatus = "idle" | "preparing" | "ready" | "error";
+
 export default function MissionPlanPage() {
   const params = useParams<{ missionId: string }>();
   const router = useRouter();
   const [mission, setMission] = React.useState<Mission | null>(null);
   const [plan, setPlan] = React.useState<MissionPlanResponse | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [lessonPrefetchStatus, setLessonPrefetchStatus] = React.useState<LessonPrefetchStatus>("idle");
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -98,6 +102,35 @@ export default function MissionPlanPage() {
     void loadWorkspace();
   }, [params.missionId]);
 
+  React.useEffect(() => {
+    if (!plan) {
+      return;
+    }
+
+    const apiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
+    const missionId = params.missionId;
+    let isCancelled = false;
+
+    setLessonPrefetchStatus("preparing");
+
+    loadInitialLesson(apiUrl, missionId)
+      .then(() => {
+        if (!isCancelled) {
+          setLessonPrefetchStatus("ready");
+        }
+      })
+      .catch((prefetchError) => {
+        console.error("failed to prepare first lesson", prefetchError);
+        if (!isCancelled) {
+          setLessonPrefetchStatus("error");
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [params.missionId, plan]);
+
   if (isLoading && !plan) {
     return (
       <div className="flex min-h-[360px] items-center justify-center">
@@ -149,7 +182,7 @@ export default function MissionPlanPage() {
           className="gap-1 bg-indigo-600 hover:bg-indigo-700"
           onClick={() => router.push(`/missions/${params.missionId}/lesson`)}
         >
-          Start first lesson
+          {lessonPrefetchStatus === "ready" ? "Open first lesson" : "Start first lesson"}
           <ArrowRight className="h-4 w-4" />
         </Button>
         <Button
@@ -164,6 +197,7 @@ export default function MissionPlanPage() {
           Refresh
         </Button>
       </div>
+      <LessonPrefetchMessage status={lessonPrefetchStatus} />
 
       <Separator className="my-8" />
 
@@ -211,6 +245,36 @@ export default function MissionPlanPage() {
         ) : null}
       </section>
     </div>
+  );
+}
+
+function LessonPrefetchMessage({ status }: { status: LessonPrefetchStatus }) {
+  if (status === "idle") {
+    return null;
+  }
+
+  if (status === "preparing") {
+    return (
+      <div className="mt-3 flex items-center gap-2 text-sm text-slate-500">
+        <Loader2 className="h-4 w-4 animate-spin text-indigo-500" />
+        Preparing first lesson in the background
+      </div>
+    );
+  }
+
+  if (status === "ready") {
+    return (
+      <div className="mt-3 flex items-center gap-2 text-sm text-emerald-700">
+        <CheckCircle2 className="h-4 w-4" />
+        First lesson is ready
+      </div>
+    );
+  }
+
+  return (
+    <p className="mt-3 text-sm text-slate-500">
+      The first lesson will be prepared when you open it.
+    </p>
   );
 }
 

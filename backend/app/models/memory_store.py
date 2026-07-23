@@ -47,6 +47,7 @@ class MemoryStore:
         self._missions: dict[str, Mission] = {}
         self._mission_plans: dict[str, MissionPlanResponse] = {}
         self._lessons: dict[tuple[str, str], LessonArtifact] = {}
+        self._task_lessons: dict[tuple[str, str], LessonArtifact] = {}
         self._learner_states: dict[str, MissionLearnerState] = {}
         self._ensure_schema()
 
@@ -92,6 +93,19 @@ class MemoryStore:
 
                 CREATE INDEX IF NOT EXISTS idx_lessons_lesson_id
                     ON lessons (lesson_id);
+
+                CREATE TABLE IF NOT EXISTS task_lessons (
+                    mission_id TEXT NOT NULL,
+                    lesson_id TEXT NOT NULL,
+                    objective_id TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    payload_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY (mission_id, lesson_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_task_lessons_objective
+                    ON task_lessons (mission_id, objective_id, created_at);
 
                 CREATE TABLE IF NOT EXISTS learner_states (
                     mission_id TEXT PRIMARY KEY,
@@ -240,7 +254,38 @@ class MemoryStore:
                     now,
                 ),
             )
-            self._lessons[(mission_id, lesson.objective_id)] = lesson
+        self._lessons[(mission_id, lesson.objective_id)] = lesson
+        return lesson
+
+    def save_task_lesson(self, mission_id: str, lesson: LessonArtifact) -> LessonArtifact:
+        now = _utc_now()
+        with self._lock, self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO task_lessons (
+                    mission_id,
+                    lesson_id,
+                    objective_id,
+                    title,
+                    payload_json,
+                    created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(mission_id, lesson_id) DO UPDATE SET
+                    objective_id = excluded.objective_id,
+                    title = excluded.title,
+                    payload_json = excluded.payload_json
+                """,
+                (
+                    mission_id,
+                    lesson.lesson_id,
+                    lesson.objective_id,
+                    lesson.title,
+                    _model_to_json(lesson),
+                    now,
+                ),
+            )
+            self._task_lessons[(mission_id, lesson.lesson_id)] = lesson
         return lesson
 
     def get_lesson(self, mission_id: str, objective_id: str) -> LessonArtifact | None:
@@ -263,6 +308,32 @@ class MemoryStore:
 
         lesson = _json_to_model(row["payload_json"], LessonArtifact)
         self._lessons[(mission_id, objective_id)] = lesson
+        return lesson
+
+    def get_lesson_by_id(self, mission_id: str, lesson_id: str) -> LessonArtifact | None:
+        for (cached_mission_id, _), lesson in self._lessons.items():
+            if cached_mission_id == mission_id and lesson.lesson_id == lesson_id:
+                return lesson
+
+        task_lesson = self._task_lessons.get((mission_id, lesson_id))
+        if task_lesson is not None:
+            return task_lesson
+
+        with self._lock, self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT payload_json
+                FROM task_lessons
+                WHERE mission_id = ? AND lesson_id = ?
+                """,
+                (mission_id, lesson_id),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        lesson = _json_to_model(row["payload_json"], LessonArtifact)
+        self._task_lessons[(mission_id, lesson_id)] = lesson
         return lesson
 
     def get_learner_state(self, mission_id: str) -> MissionLearnerState:

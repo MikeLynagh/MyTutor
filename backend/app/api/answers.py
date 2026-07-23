@@ -24,6 +24,9 @@ def submit_answer(mission_id: str, payload: AnswerSubmission):
 
     lesson = memory_store.get_lesson(mission_id, payload.objective_id)
     if lesson is None or lesson.lesson_id != payload.lesson_id:
+        lesson = memory_store.get_lesson_by_id(mission_id, payload.lesson_id)
+
+    if lesson is None or lesson.objective_id != payload.objective_id:
         raise HTTPException(status_code=404, detail="Lesson not found for this mission and objective")
 
     mission_plan = memory_store.get_mission_plan(mission_id)

@@ -8,21 +8,26 @@ import { ChevronLeft, ChevronRight, Loader2, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
-import type { answerEvaluationWithMasteryResponse, LessonStartResponse, Mission, PracticeTask } from "@/types/mission";
+import {
+  lessonStorageKey,
+  lessonTaskTypeStorageKey,
+  loadInitialLesson,
+  missionStorageKey,
+  readCachedTaskType,
+} from "@/lib/lesson-prefetch";
+import type {
+  answerEvaluationWithMasteryResponse,
+  LessonStartResponse,
+  Mission,
+  NextLearningTaskType,
+  PracticeTask,
+} from "@/types/mission";
 import {
   answerEvaluationWithMasteryResponseSchema,
   lessonStartResponseSchema,
   missionSchema,
   nextTaskResponseSchema,
 } from "@/types/mission";
-
-function lessonStorageKey(missionId: string) {
-  return `mission:${missionId}:lesson`;
-}
-
-function missionStorageKey(missionId: string) {
-  return `mission:${missionId}`;
-}
 
 function formatAssessmentType(type: string) {
   return type.replaceAll("_", " ");
@@ -31,6 +36,48 @@ function formatAssessmentType(type: string) {
 function formatPracticePurpose(purpose: string) {
   return purpose.replaceAll("_", " ");
 }
+
+function formatTaskType(type: NextLearningTaskType) {
+  return type.replaceAll("_", " ");
+}
+
+const lessonGenerationStages = [
+  {
+    title: "Preparing lesson",
+    description: "The tutor is turning the current objective into a focused lesson.",
+  },
+  {
+    title: "Checking source evidence",
+    description: "The tutor is using the selected resources and mission context to ground the explanation.",
+  },
+  {
+    title: "Creating practice tasks",
+    description: "The tutor is adding direct application and variation practice before assessment.",
+  },
+  {
+    title: "Building assessment",
+    description: "The tutor is preparing a check that matches the objective success criteria.",
+  },
+] as const;
+
+const nextTaskStages = [
+  {
+    title: "Reviewing your answer",
+    description: "The tutor is using your latest feedback and mastery estimate.",
+  },
+  {
+    title: "Choosing the next task",
+    description: "The tutor is deciding whether to remediate, vary the example, practice, or advance.",
+  },
+  {
+    title: "Preparing task content",
+    description: "The tutor is creating the next activity for this point in the mission.",
+  },
+  {
+    title: "Checking task alignment",
+    description: "The tutor is making sure the task matches the current objective.",
+  },
+] as const;
 
 function checklistItemsFromSuccessCriteria(successCriteria: string) {
   const items = successCriteria
@@ -60,6 +107,7 @@ export default function MissionLessonPage() {
   const [isRegenerating, setIsRegenerating] = React.useState(false);
   const [isSubmittingAnswer, setIsSubmittingAnswer] = React.useState(false);
   const [isContinuing, setIsContinuing] = React.useState(false);
+  const [activeTaskType, setActiveTaskType] = React.useState<NextLearningTaskType>("lesson");
   const [error, setError] = React.useState<string | null>(null);
   const [answer, setAnswer] = React.useState("");
   const [selectedOption, setSelectedOption] = React.useState("");
@@ -68,6 +116,9 @@ export default function MissionLessonPage() {
   const [answerEvaluation, setAnswerEvaluation] = React.useState<answerEvaluationWithMasteryResponse | null>(null);
 
   const assessment = lessonResponse?.lesson.assessment;
+  const initialLoadingStage = useTimedStage(isLoading && !lessonResponse, lessonGenerationStages);
+  const regenerationStage = useTimedStage(isRegenerating, lessonGenerationStages);
+  const nextTaskStage = useTimedStage(isContinuing, nextTaskStages);
   const practicalChecklistItems = React.useMemo(
     () =>
       checklistItemsFromSuccessCriteria(
@@ -122,38 +173,22 @@ export default function MissionLessonPage() {
     if (cachedLesson) {
       try {
         setLessonResponse(lessonStartResponseSchema.parse(JSON.parse(cachedLesson)));
+        setActiveTaskType(readCachedTaskType(missionId));
       } catch {
         window.sessionStorage.removeItem(lessonStorageKey(missionId));
+        window.sessionStorage.removeItem(lessonTaskTypeStorageKey(missionId));
       }
     }
 
     async function loadLesson() {
       try {
-        const [missionResponse, lessonStartResponse] = await Promise.all([
-          fetch(`${apiUrl}/api/missions/${missionId}`),
-          fetch(`${apiUrl}/api/missions/${missionId}/lessons/start`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-          }),
-        ]);
-
-        if (!missionResponse.ok) {
-          throw new Error(`Failed to load mission: ${missionResponse.status}`);
-        }
-
-        const missionData = missionSchema.parse(await missionResponse.json());
+        const { missionData, lessonData } = await loadInitialLesson(apiUrl, missionId);
         setMission(missionData);
         window.sessionStorage.setItem(missionStorageKey(missionId), JSON.stringify(missionData));
-
-        if (!lessonStartResponse.ok) {
-          throw new Error(`Failed to start lesson: ${lessonStartResponse.status}`);
-        }
-
-        const lessonData = lessonStartResponseSchema.parse(await lessonStartResponse.json());
         setLessonResponse(lessonData);
+        setActiveTaskType("lesson");
         window.sessionStorage.setItem(lessonStorageKey(missionId), JSON.stringify(lessonData));
+        window.sessionStorage.setItem(lessonTaskTypeStorageKey(missionId), "lesson");
         setError(null);
       } catch (loadError) {
         console.error("failed to load lesson", loadError);
@@ -188,7 +223,9 @@ export default function MissionLessonPage() {
 
       const lessonData = lessonStartResponseSchema.parse(await response.json());
       setLessonResponse(lessonData);
+      setActiveTaskType("lesson");
       window.sessionStorage.setItem(lessonStorageKey(missionId), JSON.stringify(lessonData));
+      window.sessionStorage.setItem(lessonTaskTypeStorageKey(missionId), "lesson");
       setError(null);
     } catch (regenerateError) {
       console.error("failed to regenerate lesson", regenerateError);
@@ -272,7 +309,9 @@ export default function MissionLessonPage() {
       };
 
       setLessonResponse(lessonData);
+      setActiveTaskType(nextTaskResponse.task_type);
       window.sessionStorage.setItem(lessonStorageKey(missionId), JSON.stringify(lessonData));
+      window.sessionStorage.setItem(lessonTaskTypeStorageKey(missionId), nextTaskResponse.task_type);
       setError(null);
     } catch (continueError) {
       console.error("failed to continue to next task", continueError);
@@ -287,9 +326,9 @@ export default function MissionLessonPage() {
       <div className="flex min-h-[360px] items-center justify-center">
         <div className="max-w-sm rounded-lg border border-slate-200 bg-slate-50 px-5 py-4 text-center">
           <Loader2 className="mx-auto h-5 w-5 animate-spin text-indigo-600" />
-          <p className="mt-3 text-sm font-medium text-slate-800">Generating your lesson</p>
+          <p className="mt-3 text-sm font-medium text-slate-800">{initialLoadingStage.title}</p>
           <p className="mt-1 text-sm leading-relaxed text-slate-500">
-            The tutor is turning your first objective into a guided lesson and assessment.
+            {initialLoadingStage.description}
           </p>
         </div>
       </div>
@@ -320,12 +359,10 @@ export default function MissionLessonPage() {
             <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-indigo-600" />
             <div>
               <p className="text-sm font-medium text-indigo-950">
-                {isContinuing ? "Preparing your next task" : "Regenerating this lesson"}
+                {isContinuing ? nextTaskStage.title : regenerationStage.title}
               </p>
               <p className="mt-1 text-sm leading-relaxed text-indigo-900/80">
-                {isContinuing
-                  ? "The tutor is using your latest answer and mastery estimate to decide what to show next."
-                  : "The tutor is creating a fresh version of this lesson from the current objective."}
+                {isContinuing ? nextTaskStage.description : regenerationStage.description}
               </p>
             </div>
           </div>
@@ -338,7 +375,7 @@ export default function MissionLessonPage() {
       ) : null}
       <div className="mb-2 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-indigo-600">
-          <span>Lesson 1</span>
+          <span>{formatTaskType(activeTaskType)}</span>
         </div>
         <Button
           type="button"
@@ -359,6 +396,14 @@ export default function MissionLessonPage() {
         Your mission: {mission?.goal ?? "build this skill step by step"}. This lesson covers{" "}
         {lessonResponse.objective_id} and prepares you for the assessment below.
       </p>
+      {activeTaskType !== "lesson" ? (
+        <div className="mb-6 rounded-lg border border-indigo-200 bg-indigo-50/70 px-4 py-3">
+          <p className="text-sm font-medium capitalize text-indigo-950">{formatTaskType(activeTaskType)}</p>
+          <p className="mt-1 text-sm leading-relaxed text-indigo-900/80">
+            This is an adaptive follow-up based on your latest answer, not a replacement for the saved lesson.
+          </p>
+        </div>
+      ) : null}
 
       <article
         className="lesson-html"
@@ -540,7 +585,7 @@ export default function MissionLessonPage() {
           <ChevronLeft className="h-4 w-4" />
           Previous Lesson
         </Button>
-        <span className="text-xs text-slate-400">Lesson 1</span>
+        <span className="text-xs text-slate-400">{formatTaskType(activeTaskType)}</span>
         <Button asChild variant="outline" size="sm" className="gap-1 border-slate-200 text-slate-600 hover:bg-slate-50">
           <Link href={`/missions/${params.missionId}/progress`}>Progress</Link>
         </Button>
@@ -681,6 +726,25 @@ function PracticalCheckAnswer({
       />
     </div>
   );
+}
+
+function useTimedStage<T extends readonly unknown[]>(isActive: boolean, stages: T): T[number] {
+  const [stageIndex, setStageIndex] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!isActive) {
+      setStageIndex(0);
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setStageIndex((current) => Math.min(current + 1, stages.length - 1));
+    }, 4500);
+
+    return () => window.clearInterval(interval);
+  }, [isActive, stages.length]);
+
+  return stages[stageIndex];
 }
 
 function buildSubmittedAnswer({

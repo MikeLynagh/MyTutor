@@ -160,7 +160,10 @@ def next_task(mission_id: str):
         selected_sources=mission_plan.selected_sources,
         recent_errors=objective_state.recent_errors,
     )
-    memory_store.save_lesson(mission_id, lesson)
+    if latest_next_task.type == "advance":
+        memory_store.save_lesson(mission_id, lesson)
+    else:
+        memory_store.save_task_lesson(mission_id, lesson)
     event_logger.log_event(
         event_type="lesson_generated",
         mission_id=mission_id,
